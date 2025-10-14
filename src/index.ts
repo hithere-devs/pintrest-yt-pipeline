@@ -24,11 +24,13 @@ async function runJob(): Promise<void> {
         lastJobResult = { ...result, ranAt: startedAt };
 
         if (result.status === 'failed') {
+            console.log(result);
             console.error(`Job failed: ${result.error}`);
         } else if (result.status === 'completed') {
             console.log(`Downloaded Pinterest video: ${result.link}`);
         }
     } catch (error) {
+        console.log(error);
         const message = error instanceof Error ? error.message : 'Unknown error';
         const failureResult: ProcessorResult = {
             status: 'failed',

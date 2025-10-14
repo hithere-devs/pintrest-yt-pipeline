@@ -8,18 +8,27 @@ upload pipeline.
 ## Requirements
 
 - Node.js 18 or newer (tested on Node 22)
+- Python 3.10 or newer (tested on Python 3.13)
 - macOS or Linux shell
 - Network access to pinterest.com and pinimg.com
+- (Optional) ffmpeg for merging separate audio/video tracks
 
 ## Getting Started
 
-1. **Install dependencies**
+1. **Install Node.js dependencies**
 
    ```bash
    npm install
    ```
 
-2. **Review the queue file**
+2. **Set up Python environment**
+
+   ```bash
+   python3 -m venv .venv
+   .venv/bin/pip install -r requirements.txt
+   ```
+
+3. **Review the queue file**
 
    - `data/data.json` holds two arrays:
      - `videoLinks`: Pinterest URLs (either full `pinterest.com/pin/...` links
@@ -27,7 +36,7 @@ upload pipeline.
      - `videosProcessed`: Metadata for downloaded videos (filled automatically)
    - Add new links by editing the file and appending to `videoLinks`.
 
-3. **Build and run the service**
+4. **Build and run the service**
 
 ```bash
 npm run build
@@ -52,14 +61,17 @@ npm run dev
 
 ## Download Flow
 
-1. Resolve `pin.it` short URLs to their full Pinterest counterparts.
-2. Parse the Pinterest HTML to locate the video source, upgrading `.m3u8`
-   playlists to `.mp4` when possible.
-3. Download the MP4 stream to `downloads/` with a timestamped filename.
-4. Append the link and file info to `videosProcessed` and persist the queue.
+1. The Node.js service calls a Python script (`scripts/pinterest_downloader.py`)
+   that:
+   - Resolves `pin.it` short URLs to full Pinterest links
+   - Parses Pinterest HTML to extract video URLs
+   - Handles HLS `.m3u8` playlists by converting to direct `.mp4` links
+   - Downloads separate video and audio tracks when available
+   - Merges tracks with ffmpeg if both exist
+2. Downloaded files are saved to `downloads/` with timestamped filenames.
+3. The link and file info are appended to `videosProcessed` and persisted.
 
-If an error occurs (e.g., Pinterest layout changes or a 403), the job response
-includes the failure reason so you can adjust quickly.
+If an error occurs, the job response includes the failure reason.
 
 ## Next Steps
 
@@ -72,10 +84,12 @@ includes the failure reason so you can adjust quickly.
 
 - **Repeated downloads**: Ensure the link is listed only once in `videoLinks`,
   and that `videosProcessed` contains the corresponding entry.
-- **403/Access errors**: Pinterest may block requests without realistic headers;
-  update the client headers in `src/pinterestClient.js` if needed.
-- **File naming**: Files are timestamped; adjust `buildFilename` in
-  `src/downloader.js` if you prefer a different scheme.
+- **Python errors**: Make sure the virtual environment is activated and all
+  packages in `requirements.txt` are installed.
+- **Missing audio**: If a video has no audio, it may use separate audio tracks
+  that require ffmpeg to merge. Install ffmpeg: `brew install ffmpeg` (macOS)
+- **File naming**: Files are timestamped (YYYY-MM-DDTHH-MM-SS.mp4); modify
+  `scripts/pinterest_downloader.py` if you need a different scheme.
 
 ## License
 

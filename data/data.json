@@ -1,4 +1,12 @@
 {
-	"videoLinks": [],
-	"videosProcessed": []
+  "videoLinks": [
+    "https://pin.it/6qfdgfTsa"
+  ],
+  "videosProcessed": [
+    {
+      "url": "https://pin.it/6qfdgfTsa",
+      "filePath": "/Users/azhar/Development/video-pipeline/downloads/2025-10-14T17-03-18.mp4",
+      "downloadedAt": "2025-10-14T11:33:19.374Z"
+    }
+  ]
 }

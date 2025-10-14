@@ -4,8 +4,7 @@ import {
     markProcessedEntry,
     isLinkProcessed,
 } from './dataStore';
-import { resolvePinUrl, extractVideoUrl } from './pinterestClient';
-import { downloadVideo } from './downloader';
+import { downloadPinterestMedia } from './pinterestDL';
 import type { QueueState } from './types';
 
 type SkippedResult = { status: 'skipped'; reason: string };
@@ -47,9 +46,7 @@ export async function processNextVideo(): Promise<ProcessorResult> {
             return { status: 'idle', reason: 'No new video links to process.' };
         }
 
-        const resolvedUrl = await resolvePinUrl(nextLink);
-        const videoUrl = await extractVideoUrl(resolvedUrl);
-        const filePath = await downloadVideo(videoUrl);
+        const filePath = await downloadPinterestMedia(nextLink);
 
         queue.videosProcessed.push(markProcessedEntry(nextLink, filePath));
         await persistQueue(queue);
@@ -57,11 +54,12 @@ export async function processNextVideo(): Promise<ProcessorResult> {
         return {
             status: 'completed',
             link: nextLink,
-            resolvedUrl,
-            videoUrl,
+            resolvedUrl: nextLink,
+            videoUrl: nextLink,
             filePath,
         };
     } catch (error) {
+        console.error(error)
         const message = error instanceof Error ? error.message : 'Unknown error';
         return {
             status: 'failed',
