@@ -165,10 +165,54 @@ def download_file(url, filename):
         return False
 
 
+def extract_pinterest_metadata(soup):
+    """
+    Extract metadata from Pinterest page (title, description, keywords).
+    Returns a dictionary with extracted information.
+    """
+    metadata = {"title": None, "description": None, "keywords": []}
+
+    # Try to extract title from meta tags
+    og_title = soup.find("meta", property="og:title")
+    if og_title and og_title.get("content"):
+        metadata["title"] = og_title["content"]
+
+    # Try twitter:title as fallback
+    if not metadata["title"]:
+        twitter_title = soup.find("meta", attrs={"name": "twitter:title"})
+        if twitter_title and twitter_title.get("content"):
+            metadata["title"] = twitter_title["content"]
+
+    # Try regular title tag as last resort
+    if not metadata["title"]:
+        title_tag = soup.find("title")
+        if title_tag:
+            metadata["title"] = title_tag.get_text().strip()
+
+    # Extract description from meta tags
+    og_description = soup.find("meta", property="og:description")
+    if og_description and og_description.get("content"):
+        metadata["description"] = og_description["content"]
+
+    # Try description meta tag as fallback
+    if not metadata["description"]:
+        desc_tag = soup.find("meta", attrs={"name": "description"})
+        if desc_tag and desc_tag.get("content"):
+            metadata["description"] = desc_tag["content"]
+
+    # Extract keywords/tags
+    keywords_tag = soup.find("meta", attrs={"name": "keywords"})
+    if keywords_tag and keywords_tag.get("content"):
+        keywords = keywords_tag["content"].split(",")
+        metadata["keywords"] = [k.strip() for k in keywords if k.strip()]
+
+    return metadata
+
+
 def download_pinterest_video(page_url, output_dir):
     """
     Download a Pinterest video from the given URL.
-    Returns the path to the downloaded file or raises an exception.
+    Returns a JSON string with file path and metadata.
     """
     # Resolve short URLs
     if "https://pin.it/" in page_url:
@@ -186,6 +230,9 @@ def download_pinterest_video(page_url, output_dir):
         raise Exception("Failed to fetch Pinterest page")
 
     soup = BeautifulSoup(body.content, "html.parser")
+
+    # Extract metadata from Pinterest page
+    pin_metadata = extract_pinterest_metadata(soup)
 
     # Extract video URL
     extract_url = None
@@ -254,14 +301,14 @@ def download_pinterest_video(page_url, output_dir):
         )
         if not merge_success:
             # Keep separate files if merge fails
-            return video_filename
+            return {"filePath": video_filename, "metadata": pin_metadata}
     else:
         # Download single file
         success = download_file(video_url, final_filename)
         if not success:
             raise Exception("Failed to download video file")
 
-    return final_filename
+    return {"filePath": final_filename, "metadata": pin_metadata}
 
 
 if __name__ == "__main__":
@@ -277,8 +324,16 @@ if __name__ == "__main__":
     output_dir = sys.argv[2]
 
     try:
-        file_path = download_pinterest_video(url, output_dir)
-        print(json.dumps({"success": True, "filePath": file_path}))
+        result = download_pinterest_video(url, output_dir)
+        print(
+            json.dumps(
+                {
+                    "success": True,
+                    "filePath": result["filePath"],
+                    "metadata": result["metadata"],
+                }
+            )
+        )
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e)}))
         sys.exit(1)

@@ -156,10 +156,12 @@ export async function uploadVideo(
  */
 export async function generateMetadata(
     pinterestUrl: string,
+    pinterestMetadata?: import('./pinterestDL').PinterestMetadata,
     filePath?: string
 ): Promise<VideoMetadata> {
     // Use AI to generate engaging title and description
-    const aiMetadata = await generateVideoMetadata(pinterestUrl, filePath);
+    // Pass Pinterest metadata to AI for better context
+    const aiMetadata = await generateVideoMetadata(pinterestUrl, pinterestMetadata, filePath);
 
     return {
         title: aiMetadata.title,

@@ -1,17 +1,4 @@
 {
-	"videoLinks": ["https://pin.it/4OQmBFFcy"],
-	"videosProcessed": [
-		{
-			"url": "https://pin.it/4OQmBFFcy",
-			"filePath": "/Users/azhar/Development/video-pipeline/downloads/2025-10-15T16-45-05.mp4",
-			"downloadedAt": "2025-10-15T11:15:08.140Z",
-			"youtube": {
-				"videoId": "k_47IPHoRdE",
-				"uploadedAt": "2025-10-15T11:15:12.300Z",
-				"title": "Pinterest Video - 2025-10-15",
-				"description": "Downloaded from Pinterest: https://pin.it/4OQmBFFcy\n\nBranded by @faith_&_fork",
-				"videoUrl": "https://www.youtube.com/watch?v=k_47IPHoRdE"
-			}
-		}
-	]
+	"videoLinks": [],
+	"videosProcessed": []
 }

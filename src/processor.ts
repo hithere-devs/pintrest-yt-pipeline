@@ -51,7 +51,17 @@ export async function processNextVideo(): Promise<ProcessorResult> {
             return { status: 'idle', reason: 'No new video links to process.' };
         }
 
-        const filePath = await downloadPinterestMedia(nextLink);
+        const downloadResult = await downloadPinterestMedia(nextLink);
+        const filePath = downloadResult.filePath;
+        const pinterestMetadata = downloadResult.metadata;
+
+        // Log extracted Pinterest metadata
+        if (pinterestMetadata?.title) {
+            console.log(`📌 Pinterest title: ${pinterestMetadata.title}`);
+        }
+        if (pinterestMetadata?.description) {
+            console.log(`📌 Pinterest description: ${pinterestMetadata.description.substring(0, 100)}...`);
+        }
 
         // Create processed entry
         const processedEntry: ProcessedVideoEntry = markProcessedEntry(nextLink, filePath);
@@ -61,7 +71,7 @@ export async function processNextVideo(): Promise<ProcessorResult> {
             try {
                 console.log('Uploading to YouTube...');
                 console.log('Generating AI-powered metadata...');
-                const metadata = await generateMetadata(nextLink, filePath);
+                const metadata = await generateMetadata(nextLink, pinterestMetadata, filePath);
                 const videoId = await uploadVideo(filePath, metadata);
 
                 // Add YouTube data to processed entry

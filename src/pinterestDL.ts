@@ -5,17 +5,29 @@ const PYTHON_BIN = path.resolve('.venv/bin/python');
 const DOWNLOADER_SCRIPT = path.resolve('scripts/pinterest_downloader.py');
 const DOWNLOAD_DIR = path.resolve('downloads');
 
+export interface PinterestMetadata {
+    title?: string;
+    description?: string;
+    keywords?: string[];
+}
+
 interface DownloadResult {
     success: boolean;
     filePath?: string;
+    metadata?: PinterestMetadata;
     error?: string;
+}
+
+export interface DownloadResponse {
+    filePath: string;
+    metadata: PinterestMetadata;
 }
 
 /**
  * Downloads a Pinterest video using the Python downloader script.
- * Returns the path to the downloaded file on success.
+ * Returns the file path and extracted Pinterest metadata.
  */
-export async function downloadPinterestMedia(url: string): Promise<string> {
+export async function downloadPinterestMedia(url: string): Promise<DownloadResponse> {
     return new Promise((resolve, reject) => {
         const args = [DOWNLOADER_SCRIPT, url, DOWNLOAD_DIR];
 
@@ -41,7 +53,10 @@ export async function downloadPinterestMedia(url: string): Promise<string> {
                 const result: DownloadResult = JSON.parse(stdout.trim());
 
                 if (result.success && result.filePath) {
-                    resolve(result.filePath);
+                    resolve({
+                        filePath: result.filePath,
+                        metadata: result.metadata || {}
+                    });
                 } else {
                     reject(new Error(result.error || 'Unknown error'));
                 }
