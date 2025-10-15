@@ -3,3 +3,5 @@ node_modules/
 *.log
 downloads/
 dist/
+youtube-config.json
+youtube-tokens.json

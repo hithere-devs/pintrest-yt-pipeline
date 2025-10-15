@@ -97,7 +97,7 @@ def get_video_and_audio_urls(m3u8_url):
 
 def merge_video_audio(video_file, audio_file, output_file):
     """
-    Merge video and audio files using ffmpeg.
+    Merge video and audio files using ffmpeg with @faith_&_fork watermark.
     Returns True if successful, False otherwise.
     """
     try:
@@ -107,14 +107,21 @@ def merge_video_audio(video_file, audio_file, output_file):
         if result.returncode != 0:
             return False
 
+        # Add watermark using drawtext filter
+        # Position: bottom center (x=(w-text_w)/2, y=h-th-20)
+        # Style: white text with black shadow/box for readability
         cmd = [
             "ffmpeg",
             "-i",
             video_file,
             "-i",
             audio_file,
-            "-c",
+            "-c:a",
             "copy",
+            "-c:v",
+            "libx264",
+            "-vf",
+            "drawtext=text='@faithandfork':fontsize=20:fontcolor=white:x=(w-text_w)/2:y=h-th-200:box=1:boxcolor=black@0.5:boxborderw=5",
             "-y",
             output_file,
         ]

@@ -5,7 +5,12 @@ import {
     isLinkProcessed,
 } from './dataStore';
 import { downloadPinterestMedia } from './pinterestDL';
-import type { QueueState } from './types';
+import {
+    uploadVideo,
+    generateMetadata,
+    isAuthenticated,
+} from './youtubeUploader';
+import type { QueueState, ProcessedVideoEntry } from './types';
 
 type SkippedResult = { status: 'skipped'; reason: string };
 type IdleResult = { status: 'idle'; reason: string };
@@ -48,7 +53,37 @@ export async function processNextVideo(): Promise<ProcessorResult> {
 
         const filePath = await downloadPinterestMedia(nextLink);
 
-        queue.videosProcessed.push(markProcessedEntry(nextLink, filePath));
+        // Create processed entry
+        const processedEntry: ProcessedVideoEntry = markProcessedEntry(nextLink, filePath);
+
+        // Upload to YouTube if authenticated
+        if (isAuthenticated()) {
+            try {
+                console.log('Uploading to YouTube...');
+                console.log('Generating AI-powered metadata...');
+                const metadata = await generateMetadata(nextLink, filePath);
+                const videoId = await uploadVideo(filePath, metadata);
+
+                // Add YouTube data to processed entry
+                processedEntry.youtube = {
+                    videoId,
+                    uploadedAt: new Date().toISOString(),
+                    title: metadata.title,
+                    description: metadata.description,
+                    videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
+                };
+
+                console.log(`YouTube upload complete: ${processedEntry.youtube.videoUrl}`);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Unknown error';
+                console.error(`YouTube upload failed: ${message}`);
+                // Continue anyway - we still have the downloaded file
+            }
+        } else {
+            console.log('YouTube upload skipped (not authenticated)');
+        }
+
+        queue.videosProcessed.push(processedEntry);
         await persistQueue(queue);
 
         return {
