@@ -11,6 +11,8 @@ import {
     isAuthenticated,
 } from './youtubeUploader';
 import type { QueueState, ProcessedVideoEntry } from './types';
+import fs from 'fs';
+import path from 'path';
 
 type SkippedResult = { status: 'skipped'; reason: string };
 type IdleResult = { status: 'idle'; reason: string };
@@ -84,6 +86,18 @@ export async function processNextVideo(): Promise<ProcessorResult> {
                 };
 
                 console.log(`YouTube upload complete: ${processedEntry.youtube.videoUrl}`);
+
+                // Delete the video file after successful upload
+                try {
+                    if (fs.existsSync(filePath)) {
+                        fs.unlinkSync(filePath);
+                        console.log(`🗑️  Deleted local file: ${path.basename(filePath)}`);
+                    }
+                } catch (deleteError) {
+                    const deleteMessage = deleteError instanceof Error ? deleteError.message : 'Unknown error';
+                    console.warn(`Failed to delete local file: ${deleteMessage}`);
+                    // Don't fail the whole process if file deletion fails
+                }
             } catch (error) {
                 const message = error instanceof Error ? error.message : 'Unknown error';
                 console.error(`YouTube upload failed: ${message}`);
