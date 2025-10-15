@@ -39,7 +39,7 @@ export async function generateVideoMetadata(
             contextInfo += `\nPinterest keywords: ${pinterestMetadata.keywords.join(', ')}`;
         }
 
-        const prompt = `You are a senior social media content expert and SEO specialist for the brand "@faith_&_fork". Our brand has two main content pillars: 1) Halal food and recipes, and 2) Spiritually uplifting Islamic content. Your primary job is to correctly identify the video's theme and generate perfectly tailored content.
+        const prompt = `You are a senior social media content expert and SEO specialist for the brand "@faithandfork". Our brand has two main content pillars: 1) Halal food and recipes, and 2) Spiritually uplifting Islamic content. Your primary job is to correctly identify the video's theme and generate perfectly tailored content.
 
 **Input Data:**
 You will be given these two variables:
@@ -75,13 +75,13 @@ Follow the instructions for the theme you identified in Step 1.
 *   **Persona:** Your tone must be reverent, peaceful, and inspirational.
 *   **1. Video Title (Max 100 chars):**
     *   **Content:** Create a soul-touching and emotional title. Use words like "Sukun," "Peaceful," "Jummah Mubarak," "Subhan'Allah," "Masha'Allah." The title should reflect the spiritual feeling of the video.
-    *   **Branding:** Include \`| @faith_&_fork\`.
+    *   **Branding:** Include \`| @faithandfork\`.
     *   **Hashtags:** End with 1-2 relevant hashtags like \`#islamic\`, \`#makkah\`, \`#shorts\`.
-    *   **Example:** "Sukun-e-Qalb ❤️ The Peaceful Azan from Madinah | @faith_&_fork #madinah #islam"
+    *   **Example:** "Sukun-e-Qalb ❤️ The Peaceful Azan from Madinah | @faithandfork #madinah #islam"
 
 *   **2. Video Description:**
     *   **Content:** Write 1-2 short, reflective paragraphs about the beauty of Islam, the scene in the video, or a gentle reminder.
-    *   **Brand Mention:** Connect the brand to the theme spiritually, e.g., "At @faith_&_fork, we pray these moments bring peace to your heart."
+    *   **Brand Mention:** Connect the brand to the theme spiritually, e.g., "At @faithandfork, we pray these moments bring peace to your heart."
     *   **CTA:** Use a spiritual call-to-action, e.g., "Share this beautiful reminder with your loved ones. May Allah bless you."
     *   **Hashtags:** List ALL generated tags at the bottom.
 
@@ -96,13 +96,13 @@ Follow the instructions for the theme you identified in Step 1.
 *   **Persona:** Your tone must be warm, inviting, and focused on the joy of cooking.
 *   **1. Video Title (Max 100 chars):**
     *   **Content:** Create a catchy, emotional, Hinglish/Urdu title. Use words like "Lazeez," "Zaykedar," "Dil Khush." It should make the food sound irresistible. AVOID DATES.
-    *   **Branding:** Include \`| @faith_&_fork\`.
+    *   **Branding:** Include \`| @faithandfork\`.
     *   **Hashtags:** End with 1-2 relevant hashtags like \`#recipe\`, \`#halalfood\`, \`#shorts\`.
-    *   **Example:** "Dil Khush Kar Dene Wali Chicken Biryani! 😋 | @faith_&_fork #biryani #recipe"
+    *   **Example:** "Dil Khush Kar Dene Wali Chicken Biryani! 😋 | @faithandfork #biryani #recipe"
 
 *   **2. Video Description:**
     *   **Content:** Write 2 engaging paragraphs describing the dish and why it's special.
-    *   **Brand Mention:** Connect the brand to the food, e.g., "At @faith_&_fork, we believe that good food brings families together."
+    *   **Brand Mention:** Connect the brand to the food, e.g., "At @faithandfork, we believe that good food brings families together."
     *   **CTA:** Use a standard call-to-action, e.g., "Don't forget to like, subscribe, and share for more delicious recipes!"
     *   **Hashtags:** List ALL generated tags at the bottom.
 
@@ -195,9 +195,9 @@ function generateFallbackMetadata(
     }
 
     // Use Pinterest description if available
-    let description = `🍽️ Amazing food content from Pinterest!\n\nOriginal source: ${pinterestUrl}\n\nBrought to you by @faith_&_fork - Your destination for incredible recipes and cooking inspiration.\n\n👍 Like this video if you enjoyed it!\n📺 Subscribe for more delicious content!\n💬 Comment below with your thoughts!\n\n#food #cooking #recipe #pinterest #delicious #yummy #homecooking #foodie #faith_and_fork #tasty`;
+    let description = `🍽️ Amazing food content from Pinterest!\n\nOriginal source: ${pinterestUrl}\n\nBrought to you by @faithandfork - Your destination for incredible recipes and cooking inspiration.\n\n👍 Like this video if you enjoyed it!\n📺 Subscribe for more delicious content!\n💬 Comment below with your thoughts!\n\n#food #cooking #recipe #pinterest #delicious #yummy #homecooking #foodie #faith_and_fork #tasty`;
     if (pinterestMetadata?.description) {
-        description = `${pinterestMetadata.description}\n\nOriginal source: ${pinterestUrl}\n\n@faith_&_fork\n\n👍 Like • 📺 Subscribe • 💬 Comment!\n\n#food #cooking #recipe #pinterest #delicious #yummy #homecooking #foodie #faith_and_fork #tasty`;
+        description = `${pinterestMetadata.description}\n\nOriginal source: ${pinterestUrl}\n\n@faithandfork\n\n👍 Like • 📺 Subscribe • 💬 Comment!\n\n#food #cooking #recipe #pinterest #delicious #yummy #homecooking #foodie #faith_and_fork #tasty`;
     }
 
     // Combine Pinterest keywords with default tags

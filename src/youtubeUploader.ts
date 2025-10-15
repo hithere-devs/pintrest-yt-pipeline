@@ -125,7 +125,7 @@ export async function uploadVideo(
                     defaultLanguage: 'en',
                 },
                 status: {
-                    privacyStatus: metadata.privacyStatus || 'private',
+                    privacyStatus: 'public',
                     selfDeclaredMadeForKids: false,
                 },
             },
