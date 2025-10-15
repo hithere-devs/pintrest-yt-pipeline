@@ -33,8 +33,62 @@ export type ProcessorResult = SkippedResult | IdleResult | CompletedResult | Fai
 
 let isProcessing = false;
 
+// Minimum time gap between uploads in milliseconds (2 hours)
+const UPLOAD_RATE_LIMIT_MS = 2 * 60 * 60 * 1000; // 2 hours
+
 function getNextUnprocessedLink(queue: QueueState): string | undefined {
     return queue.videoLinks.find((link) => !isLinkProcessed(link, queue.videosProcessed));
+}
+
+/**
+ * Check if enough time has passed since the last YouTube upload
+ * Returns true if we can proceed with upload, false if we need to wait
+ */
+function canUploadNow(queue: QueueState): { canUpload: boolean; reason?: string; waitTimeMs?: number } {
+    // Find the most recent YouTube upload
+    let latestUploadTime: Date | null = null;
+
+    for (const entry of queue.videosProcessed) {
+        if (typeof entry !== 'string' && entry.youtube?.uploadedAt) {
+            const uploadTime = new Date(entry.youtube.uploadedAt);
+            if (!latestUploadTime || uploadTime > latestUploadTime) {
+                latestUploadTime = uploadTime;
+            }
+        }
+    }
+
+    // If no previous uploads, allow upload
+    if (!latestUploadTime) {
+        return { canUpload: true };
+    }
+
+    // Calculate time since last upload
+    const now = new Date();
+    const timeSinceLastUpload = now.getTime() - latestUploadTime.getTime();
+
+    // Check if 2 hours have passed
+    if (timeSinceLastUpload >= UPLOAD_RATE_LIMIT_MS) {
+        return { canUpload: true };
+    }
+
+    // Calculate remaining wait time
+    const waitTimeMs = UPLOAD_RATE_LIMIT_MS - timeSinceLastUpload;
+    const waitTimeMinutes = Math.ceil(waitTimeMs / 60000);
+    const waitTimeHours = Math.floor(waitTimeMinutes / 60);
+    const remainingMinutes = waitTimeMinutes % 60;
+
+    let timeString = '';
+    if (waitTimeHours > 0) {
+        timeString = `${waitTimeHours}h ${remainingMinutes}m`;
+    } else {
+        timeString = `${waitTimeMinutes}m`;
+    }
+
+    return {
+        canUpload: false,
+        reason: `Rate limit: Must wait ${timeString} since last upload (${latestUploadTime.toISOString()})`,
+        waitTimeMs,
+    };
 }
 
 export async function processNextVideo(): Promise<ProcessorResult> {
@@ -53,6 +107,23 @@ export async function processNextVideo(): Promise<ProcessorResult> {
             return { status: 'idle', reason: 'No new video links to process.' };
         }
 
+        // Check rate limit BEFORE downloading to save disk space
+        if (isAuthenticated()) {
+            const rateLimitCheck = canUploadNow(queue);
+
+            if (!rateLimitCheck.canUpload) {
+                console.log(`⏳ ${rateLimitCheck.reason}`);
+                console.log(`⏭️  Skipping download to save disk space`);
+                console.log(`⏰ Next upload available in: ${Math.ceil((rateLimitCheck.waitTimeMs || 0) / 60000)} minutes`);
+
+                // Don't download yet - will retry later when rate limit allows
+                return {
+                    status: 'skipped',
+                    reason: rateLimitCheck.reason || 'Rate limit exceeded',
+                };
+            }
+        }
+
         const downloadResult = await downloadPinterestMedia(nextLink);
         const filePath = downloadResult.filePath;
         const pinterestMetadata = downloadResult.metadata;
@@ -68,8 +139,9 @@ export async function processNextVideo(): Promise<ProcessorResult> {
         // Create processed entry
         const processedEntry: ProcessedVideoEntry = markProcessedEntry(nextLink, filePath);
 
-        // Upload to YouTube if authenticated
+        // Upload to YouTube (rate limit already checked)
         if (isAuthenticated()) {
+
             try {
                 console.log('Uploading to YouTube...');
                 console.log('Generating AI-powered metadata...');
