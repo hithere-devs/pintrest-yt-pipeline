@@ -47,7 +47,7 @@ async function runJob(): Promise<void> {
     }
 }
 
-cron.schedule('*/2 * * * *', () => {
+cron.schedule('* * * * *', () => {
     void runJob();
 });
 

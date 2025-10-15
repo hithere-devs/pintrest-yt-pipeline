@@ -56,19 +56,49 @@ upload pipeline.
 
 5. **Build and run the service**
 
-```bash
-npm run build
-npm start
-```
+   **For Development (manual terminal):**
 
-The TypeScript compiler emits to `dist/`. The server listens on
-`http://localhost:4000`, triggers an immediate queue check, and then runs every
-two minutes via cron. During development you can skip the build step and use the
-watch mode instead:
+   ```bash
+   npm run build
+   npm start
+   ```
 
-```bash
-npm run dev
-```
+   The TypeScript compiler emits to `dist/`. The server listens on
+   `http://localhost:4000`, triggers an immediate queue check, and then runs
+   every two minutes via cron. During development you can skip the build step
+   and use the watch mode instead:
+
+   ```bash
+   npm run dev
+   ```
+
+   **For Production (background service with PM2):**
+
+   See [PM2 Setup Guide](PM2_SETUP.md) for detailed instructions, or use the
+   quick start script:
+
+   ```bash
+   ./start-pm2.sh
+   ```
+
+   This will:
+
+   - Install PM2 globally (if not already installed)
+   - Build the project
+   - Start the service in the background
+   - Enable auto-restart on crashes
+   - Enable auto-start on system reboot
+
+   **PM2 Quick Commands:**
+
+   ```bash
+   npm run pm2:status    # Check status
+   npm run pm2:logs      # View logs
+   npm run pm2:monit     # Monitor resources
+   npm run pm2:restart   # Restart service
+   npm run pm2:deploy    # Build and restart
+   npm run pm2:stop      # Stop service
+   ```
 
 ## YouTube Integration Setup
 

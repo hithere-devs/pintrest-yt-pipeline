@@ -8,7 +8,15 @@
 		"build": "tsc --project tsconfig.json",
 		"start": "node dist/index.js",
 		"dev": "tsx watch src/index.ts",
-		"clean": "rimraf dist"
+		"clean": "rimraf dist",
+		"pm2:start": "pm2 start ecosystem.config.js",
+		"pm2:stop": "pm2 stop pinterest-youtube-pipeline",
+		"pm2:restart": "pm2 restart pinterest-youtube-pipeline",
+		"pm2:delete": "pm2 delete pinterest-youtube-pipeline",
+		"pm2:logs": "pm2 logs pinterest-youtube-pipeline",
+		"pm2:monit": "pm2 monit",
+		"pm2:status": "pm2 status",
+		"pm2:deploy": "npm run build && pm2 restart pinterest-youtube-pipeline"
 	},
 	"keywords": [
 		"pinterest",
