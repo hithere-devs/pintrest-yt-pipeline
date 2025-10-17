@@ -103,6 +103,13 @@ export async function processNextVideo(): Promise<ProcessorResult> {
         const queue = await loadQueue();
         nextLink = getNextUnprocessedLink(queue);
 
+        // Calculate and log queue statistics
+        const totalLinks = queue.videoLinks.length;
+        const processedCount = queue.videosProcessed.length;
+        const remainingCount = totalLinks - processedCount;
+
+        console.log(`📊 Queue Status: ${processedCount} processed | ${remainingCount} remaining | ${totalLinks} total`);
+
         if (!nextLink) {
             return { status: 'idle', reason: 'No new video links to process.' };
         }
@@ -123,6 +130,8 @@ export async function processNextVideo(): Promise<ProcessorResult> {
                 };
             }
         }
+
+        console.log(`🎬 Processing video ${processedCount + 1}/${totalLinks}: ${nextLink}`);
 
         const downloadResult = await downloadPinterestMedia(nextLink);
         const filePath = downloadResult.filePath;
@@ -181,6 +190,8 @@ export async function processNextVideo(): Promise<ProcessorResult> {
 
         queue.videosProcessed.push(processedEntry);
         await persistQueue(queue);
+
+        console.log(`✅ Completed! Progress: ${processedCount + 1}/${totalLinks} videos processed`);
 
         return {
             status: 'completed',
