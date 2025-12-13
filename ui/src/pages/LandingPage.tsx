@@ -439,7 +439,12 @@ function CTASection() {
 				</motion.div>
 				<motion.div
 					animate={{ y: [0, 20, 0], rotate: [0, -10, 0] }}
-					transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+					transition={{
+						duration: 6,
+						repeat: Infinity,
+						ease: 'easeInOut',
+						delay: 1,
+					}}
 					className='absolute -bottom-10 right-0 md:right-20 text-blue-500/30 hidden md:block'
 				>
 					<TrendingUp size={64} />
@@ -469,7 +474,8 @@ function CTASection() {
 					variants={fadeInUp}
 					className='text-xl text-gray-400 mb-12 max-w-2xl mx-auto'
 				>
-					Join the creators who are dominating the feed. No credit card required.
+					Join the creators who are dominating the feed. No credit card
+					required.
 				</motion.p>
 
 				<motion.div
