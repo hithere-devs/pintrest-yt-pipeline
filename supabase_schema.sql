@@ -27,7 +27,9 @@ create table if not exists "Video" (
   "youtubeTitle" text,
   "youtubeDesc" text,
   "thumbnailUrl" text,
-  "errorMessage" text
+  "errorMessage" text,
+  "pinterestTitle" text,
+  "pinterestDescription" text
 );
 
 -- Create indexes

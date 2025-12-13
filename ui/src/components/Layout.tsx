@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
 	LayoutDashboard,
 	ListVideo,
@@ -14,9 +14,8 @@ import {
 	Menu,
 	X,
 	ChevronDown,
-	Calendar,
-	ArrowRight,
 	HelpCircle,
+	Calendar,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -36,12 +35,14 @@ const navItems = [
 	{ icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
 	{ icon: ListVideo, label: 'Queue', path: '/dashboard/queue' },
 	{ icon: History, label: 'History', path: '/dashboard/history' },
+	{ icon: Calendar, label: 'Schedule', path: '/dashboard/calendar' },
 	{ icon: Settings, label: 'Settings', path: '/dashboard/settings' },
 ];
 
 export default function Layout() {
 	const { user, signOut } = useAuth();
 	const { theme, toggleTheme } = useTheme();
+	const navigate = useNavigate();
 	const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
 	const today = new Date();
@@ -223,7 +224,7 @@ export default function Layout() {
 			<main className='flex-1 flex flex-col overflow-hidden'>
 				{/* Header */}
 				<header className='flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-dark-border bg-white/50 dark:bg-dark-card/50 backdrop-blur-sm'>
-					{/* Left Section - Date & CTA */}
+					{/* Left Section - Date */}
 					<div className='flex items-center gap-6'>
 						<Button
 							variant='ghost'
@@ -234,33 +235,25 @@ export default function Layout() {
 							<Menu size={20} />
 						</Button>
 
-						{/* Date Widget */}
-						<div className='hidden md:flex items-center gap-4'>
-							<div className='flex items-center gap-3'>
-								<div className='w-14 h-14 bg-white dark:bg-dark-card rounded-2xl border border-gray-100 dark:border-dark-border flex flex-col items-center justify-center shadow-sm'>
-									<span className='text-2xl font-bold text-gray-900 dark:text-white leading-none'>
-										{dayOfMonth}
-									</span>
-								</div>
-								<div>
-									<p className='text-sm font-medium text-gray-900 dark:text-white'>
-										{dayName},
-									</p>
-									<p className='text-sm text-gray-500 dark:text-gray-400'>
-										{monthName}
-									</p>
-								</div>
+						{/* Date Widget - clickable to navigate to calendar */}
+						<button
+							onClick={() => navigate('/dashboard/calendar')}
+							className='hidden md:flex items-center gap-3 hover:opacity-80 transition-opacity'
+						>
+							<div className='w-14 h-14 bg-white dark:bg-dark-card rounded-2xl border border-gray-100 dark:border-dark-border flex flex-col items-center justify-center shadow-sm'>
+								<span className='text-2xl font-bold text-gray-900 dark:text-white leading-none'>
+									{dayOfMonth}
+								</span>
 							</div>
-
-							<Button className='bg-coral hover:bg-coral-dark text-white rounded-full px-5 gap-2 shadow-lg shadow-coral/20'>
-								Show my Tasks
-								<ArrowRight size={16} />
-							</Button>
-
-							<Button variant='outline' size='icon' className='rounded-full'>
-								<Calendar size={18} />
-							</Button>
-						</div>
+							<div>
+								<p className='text-sm font-medium text-gray-900 dark:text-white'>
+									{dayName},
+								</p>
+								<p className='text-sm text-gray-500 dark:text-gray-400'>
+									{monthName}
+								</p>
+							</div>
+						</button>
 					</div>
 
 					{/* Center Section - Welcome Message (hidden on mobile) */}

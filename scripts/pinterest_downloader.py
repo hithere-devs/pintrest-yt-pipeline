@@ -13,6 +13,20 @@ from datetime import datetime
 import sys
 import json
 
+# Browser-like headers to avoid being blocked by Pinterest
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Cache-Control": "max-age=0",
+}
+
 
 def get_video_and_audio_urls(m3u8_url):
     """
@@ -22,12 +36,12 @@ def get_video_and_audio_urls(m3u8_url):
     try:
         # Method 1: Try the old conversion method first (hls -> 720p, m3u8 -> mp4)
         simple_convert_url = m3u8_url.replace("hls", "720p").replace("m3u8", "mp4")
-        response = requests.head(simple_convert_url)
+        response = requests.head(simple_convert_url, headers=HEADERS)
         if response.status_code == 200:
             return simple_convert_url, None, "simple"
 
         # Method 2: Parse the HLS playlist to find video and audio streams
-        response = requests.get(m3u8_url)
+        response = requests.get(m3u8_url, headers=HEADERS)
         if response.status_code != 200:
             return None, None, "failed"
 
@@ -40,13 +54,13 @@ def get_video_and_audio_urls(m3u8_url):
         if audio_match:
             audio_playlist_url = base_url + audio_match.group(1)
 
-            audio_response = requests.get(audio_playlist_url)
+            audio_response = requests.get(audio_playlist_url, headers=HEADERS)
             if audio_response.status_code == 200:
                 audio_content = audio_response.text
                 for line in audio_content.split("\n"):
                     if line.endswith(".cmfa"):
                         audio_file_url = base_url + line.strip()
-                        check_response = requests.head(audio_file_url)
+                        check_response = requests.head(audio_file_url, headers=HEADERS)
                         if check_response.status_code == 200:
                             audio_url = audio_file_url
                             break
@@ -61,14 +75,16 @@ def get_video_and_audio_urls(m3u8_url):
                     ".m3u8", f"_{quality}.m3u8"
                 )
 
-                stream_response = requests.get(stream_url)
+                stream_response = requests.get(stream_url, headers=HEADERS)
                 if stream_response.status_code == 200:
                     stream_content = stream_response.text
 
                     for line in stream_content.split("\n"):
                         if line.endswith(".cmfv"):
                             video_file_url = base_url + line.strip()
-                            check_response = requests.head(video_file_url)
+                            check_response = requests.head(
+                                video_file_url, headers=HEADERS
+                            )
                             if check_response.status_code == 200:
                                 video_url = video_file_url
                                 break
@@ -80,7 +96,7 @@ def get_video_and_audio_urls(m3u8_url):
         if not video_url:
             for line in playlist_content.split("\n"):
                 if ".mp4" in line and line.startswith("http"):
-                    check_response = requests.head(line.strip())
+                    check_response = requests.head(line.strip(), headers=HEADERS)
                     if check_response.status_code == 200:
                         video_url = line.strip()
                         break
@@ -141,7 +157,7 @@ def merge_video_audio(video_file, audio_file, output_file):
 
 def download_file(url, filename):
     try:
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, headers=HEADERS)
 
         if response.status_code != 200:
             return False
@@ -216,18 +232,23 @@ def download_pinterest_video(page_url, output_dir):
     """
     # Resolve short URLs
     if "https://pin.it/" in page_url:
-        t_body = requests.get(page_url)
+        t_body = requests.get(page_url, headers=HEADERS)
         if t_body.status_code != 200:
             raise Exception("Invalid URL or network error")
         soup = BeautifulSoup(t_body.content, "html.parser")
-        href_link = (soup.find("link", rel="alternate"))["href"]
-        match = re.search("url=(.*?)&", href_link)
+        link_tag = soup.find("link", rel="alternate")
+        if not link_tag or not link_tag.get("href"):
+            raise Exception("Could not find alternate link for short URL")
+        href_link = link_tag["href"]
+        match = re.search(r"url=(.*?)&", href_link)
+        if not match:
+            raise Exception("Could not parse Pinterest URL from alternate link")
         page_url = match.group(1)
 
     # Fetch page content
-    body = requests.get(page_url)
+    body = requests.get(page_url, headers=HEADERS)
     if body.status_code != 200:
-        raise Exception("Failed to fetch Pinterest page")
+        raise Exception(f"Failed to fetch Pinterest page (status: {body.status_code})")
 
     soup = BeautifulSoup(body.content, "html.parser")
 

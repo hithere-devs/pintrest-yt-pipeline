@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
 	Youtube,
 	Edit2,
@@ -9,6 +10,8 @@ import {
 	XCircle,
 	Clock,
 	Filter,
+	RefreshCw,
+	Camera,
 } from 'lucide-react';
 import { fetchWithAuth } from '../api';
 import VideoEditorModal from '../components/VideoEditorModal';
@@ -18,6 +21,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from '../components/ui/card';
+import { Button } from '../components/ui/button';
 
 interface Video {
 	id: string;
@@ -31,6 +35,7 @@ interface Video {
 	uploadedAt?: string;
 	youtubeDesc?: string;
 	youtubeTags?: string[];
+	localFilePath?: string;
 }
 
 interface DashboardData {
@@ -38,9 +43,11 @@ interface DashboardData {
 }
 
 export default function HistoryPage() {
+	const navigate = useNavigate();
 	const [data, setData] = useState<DashboardData | null>(null);
 	const [editingVideo, setEditingVideo] = useState<Video | null>(null);
 	const [filter, setFilter] = useState<'all' | 'uploaded' | 'failed'>('all');
+	const [retryingVideos, setRetryingVideos] = useState<Set<string>>(new Set());
 
 	const fetchData = async () => {
 		try {
@@ -48,6 +55,26 @@ export default function HistoryPage() {
 			setData(json);
 		} catch (err) {
 			console.error(err);
+		}
+	};
+
+	const handleRetry = async (videoId: string) => {
+		setRetryingVideos((prev) => new Set(prev).add(videoId));
+		try {
+			await fetchWithAuth(`/queue/${videoId}/retry`, {
+				method: 'POST',
+			});
+			// Refresh the data after retry
+			await fetchData();
+		} catch (err) {
+			console.error('Failed to retry video:', err);
+			alert('Failed to retry video. Please try again.');
+		} finally {
+			setRetryingVideos((prev) => {
+				const newSet = new Set(prev);
+				newSet.delete(videoId);
+				return newSet;
+			});
 		}
 	};
 
@@ -203,22 +230,37 @@ export default function HistoryPage() {
 											</span>
 										</div>
 										{/* Hover Actions */}
-										{video.youtubeUrl && (
+										{(video.youtubeUrl || video.localFilePath) && (
 											<div className='absolute inset-0 bg-black/60 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity'>
-												<a
-													href={video.youtubeUrl}
-													target='_blank'
-													rel='noreferrer'
-													className='w-10 h-10 bg-white rounded-full flex items-center justify-center text-red-600 hover:scale-110 transition-transform'
-												>
-													<Youtube size={20} />
-												</a>
+												{video.youtubeUrl && (
+													<a
+														href={video.youtubeUrl}
+														target='_blank'
+														rel='noreferrer'
+														className='w-10 h-10 bg-white rounded-full flex items-center justify-center text-red-600 hover:scale-110 transition-transform'
+														title='View on YouTube'
+													>
+														<Youtube size={20} />
+													</a>
+												)}
 												{video.youtubeVideoId && (
 													<button
 														onClick={() => setEditingVideo(video)}
 														className='w-10 h-10 bg-white rounded-full flex items-center justify-center text-coral hover:scale-110 transition-transform'
+														title='Edit video details'
 													>
 														<Edit2 size={18} />
+													</button>
+												)}
+												{video.localFilePath && (
+													<button
+														onClick={() =>
+															navigate(`/dashboard/video/${video.id}`)
+														}
+														className='w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-600 hover:scale-110 transition-transform'
+														title='Extract frames & research'
+													>
+														<Camera size={18} />
 													</button>
 												)}
 											</div>
@@ -246,6 +288,30 @@ export default function HistoryPage() {
 												<ExternalLink size={12} />
 											</a>
 										</div>
+
+										{/* Retry Button for Failed Videos */}
+										{video.status === 'FAILED' && (
+											<div className='mt-3'>
+												<Button
+													onClick={() => handleRetry(video.id)}
+													disabled={retryingVideos.has(video.id)}
+													className='w-full bg-coral hover:bg-coral-dark text-white gap-2'
+													size='sm'
+												>
+													{retryingVideos.has(video.id) ? (
+														<>
+															<RefreshCw size={14} className='animate-spin' />
+															Retrying...
+														</>
+													) : (
+														<>
+															<RefreshCw size={14} />
+															Retry Upload
+														</>
+													)}
+												</Button>
+											</div>
+										)}
 									</div>
 								</div>
 							))}

@@ -1,10 +1,19 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { PinterestMetadata } from './pinterestDL';
+import { getDeepResearch } from './deepResearch';
 
 interface VideoMetadata {
     title: string;
     description: string;
     tags: string[];
+    thumbnailPrompt?: string;
+}
+
+interface GenerationOptions {
+    /** Use deep research for enhanced content generation */
+    useDeepResearch?: boolean;
+    /** Frame descriptions from video analysis */
+    frameDescriptions?: string[];
 }
 
 /**
@@ -14,13 +23,43 @@ interface VideoMetadata {
 export async function generateVideoMetadata(
     pinterestUrl: string,
     pinterestMetadata?: PinterestMetadata,
-    videoFilePath?: string
+    videoFilePath?: string,
+    options?: GenerationOptions
 ): Promise<VideoMetadata> {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
         console.warn('GEMINI_API_KEY not found, using fallback metadata');
         return generateFallbackMetadata(pinterestUrl, pinterestMetadata);
+    }
+
+    // Try deep research if enabled
+    if (options?.useDeepResearch) {
+        try {
+            console.log('🔬 Using deep research for content generation...');
+            const dr = getDeepResearch();
+            const result = await dr.researchVideoContent({
+                pinterestUrl,
+                pinterestTitle: pinterestMetadata?.title,
+                pinterestDescription: pinterestMetadata?.description,
+                keywords: pinterestMetadata?.keywords,
+                frameDescriptions: options.frameDescriptions,
+            });
+
+            console.log('✨ Deep research generated metadata:');
+            console.log(`   Title: ${result.title}`);
+            console.log(`   Tags: ${result.tags.join(', ')}`);
+
+            return {
+                title: result.title.substring(0, 100),
+                description: result.description.substring(0, 5000),
+                tags: result.tags.slice(0, 15),
+                thumbnailPrompt: result.thumbnailPrompt,
+            };
+        } catch (error) {
+            console.warn('Deep research failed, falling back to standard generation:', error);
+            // Fall through to standard generation
+        }
     }
 
     try {

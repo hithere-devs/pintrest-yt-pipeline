@@ -2,6 +2,11 @@ import {
     getNextQueuedVideo,
     updateVideoStatus,
     getLastUploadTime,
+    getNextVideoForRetry,
+    incrementRetryCount,
+    resetVideoForRetry,
+    markVideoPermanentlyFailed,
+    MAX_RETRIES,
     DbVideo
 } from './db';
 import { downloadPinterestMedia } from './pinterestDL';
@@ -20,14 +25,23 @@ type CompletedResult = {
     resolvedUrl: string;
     videoUrl: string;
     filePath: string;
+    isRetry?: boolean;
 };
 type FailedResult = {
     status: 'failed';
     error: string;
     link?: string;
+    retryCount?: number;
+    willRetry?: boolean;
+};
+type RetryingResult = {
+    status: 'retrying';
+    link: string;
+    retryCount: number;
+    maxRetries: number;
 };
 
-export type ProcessorResult = SkippedResult | IdleResult | CompletedResult | FailedResult;
+export type ProcessorResult = SkippedResult | IdleResult | CompletedResult | FailedResult | RetryingResult;
 
 let isProcessing = false;
 
@@ -41,9 +55,24 @@ export async function processNextVideo(): Promise<ProcessorResult> {
     isProcessing = true;
 
     let currentVideo: DbVideo | null = null;
+    let isRetry = false;
 
     try {
+        // First, try to get a queued video
         currentVideo = await getNextQueuedVideo();
+
+        // If no queued videos, check for videos that need retrying
+        if (!currentVideo) {
+            currentVideo = await getNextVideoForRetry();
+            if (currentVideo) {
+                isRetry = true;
+                const newRetryCount = await incrementRetryCount(currentVideo.id);
+                console.log(`🔄 Retrying video ID ${currentVideo.id} (attempt ${newRetryCount}/${MAX_RETRIES}): ${currentVideo.pinterestUrl}`);
+
+                // Reset status to QUEUED for processing
+                await resetVideoForRetry(currentVideo.id);
+            }
+        }
 
         if (!currentVideo) {
             return { status: 'idle', reason: 'No new video links to process.' };
@@ -104,12 +133,17 @@ export async function processNextVideo(): Promise<ProcessorResult> {
             fs.unlinkSync(filePath);
         }
 
+        if (isRetry) {
+            console.log(`✅ Retry successful for video ID ${currentVideo.id}`);
+        }
+
         return {
             status: 'completed',
             link: currentVideo.pinterestUrl,
             resolvedUrl: currentVideo.pinterestUrl,
             videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
             filePath,
+            isRetry,
         };
 
     } catch (error) {
@@ -117,16 +151,36 @@ export async function processNextVideo(): Promise<ProcessorResult> {
         console.error(`Job failed: ${message}`);
 
         if (currentVideo) {
-            await updateVideoStatus(currentVideo.id, {
-                status: 'FAILED',
-                errorMessage: message
-            });
+            const retryCount = currentVideo.retryCount ?? 0;
+            const willRetry = retryCount < MAX_RETRIES - 1; // -1 because we haven't incremented yet for new failures
+
+            if (isRetry && retryCount >= MAX_RETRIES) {
+                // Max retries exceeded
+                console.error(`❌ Max retries (${MAX_RETRIES}) exceeded for video ID ${currentVideo.id}`);
+                await markVideoPermanentlyFailed(currentVideo.id, message);
+            } else {
+                await updateVideoStatus(currentVideo.id, {
+                    status: 'FAILED',
+                    errorMessage: message
+                });
+
+                if (willRetry) {
+                    console.log(`⏳ Video ID ${currentVideo.id} will be retried (${retryCount + 1}/${MAX_RETRIES})`);
+                }
+            }
+
+            return {
+                status: 'failed',
+                error: message,
+                link: currentVideo.pinterestUrl,
+                retryCount: retryCount,
+                willRetry: willRetry,
+            };
         }
 
         return {
             status: 'failed',
             error: message,
-            link: currentVideo?.pinterestUrl,
         };
     } finally {
         isProcessing = false;
