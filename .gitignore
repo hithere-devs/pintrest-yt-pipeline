@@ -6,6 +6,7 @@ dist/
 youtube-config.json
 gcp-credentials.json
 youtube-tokens.json
+gcp-servicekey.json
 
 # PM2 logs and runtime files
 logs/
