@@ -16,6 +16,7 @@ import {
 	ChevronDown,
 	HelpCircle,
 	Calendar,
+	Wand2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -35,6 +36,7 @@ const navItems = [
 	{ icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
 	{ icon: ListVideo, label: 'Queue', path: '/dashboard/queue' },
 	{ icon: History, label: 'History', path: '/dashboard/history' },
+	{ icon: Wand2, label: 'Generate', path: '/dashboard/generate' },
 	{ icon: Calendar, label: 'Schedule', path: '/dashboard/calendar' },
 	{ icon: Settings, label: 'Settings', path: '/dashboard/settings' },
 ];

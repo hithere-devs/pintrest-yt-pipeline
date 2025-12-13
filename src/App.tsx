@@ -7,6 +7,7 @@ import HistoryPage from './pages/HistoryPage';
 import VideoDetailPage from './pages/VideoDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import CalendarPage from './pages/CalendarPage';
+import ViralVideoGeneratorPage from './pages/ViralVideoGeneratorPage';
 import AuthPage from './pages/AuthPage';
 import LandingPage from './pages/LandingPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -97,6 +98,7 @@ function App() {
 							<Route path='queue' element={<QueuePage />} />
 							<Route path='history' element={<HistoryPage />} />
 							<Route path='video/:videoId' element={<VideoDetailPage />} />
+							<Route path='generate' element={<ViralVideoGeneratorPage />} />
 							<Route path='settings' element={<SettingsPage />} />
 							<Route path='calendar' element={<CalendarPage />} />
 						</Route>
