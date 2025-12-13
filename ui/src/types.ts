@@ -1,12 +1,9 @@
-export type VideoStatus = 'QUEUED' | 'PROCESSING' | 'DOWNLOADED' | 'UPLOADED' | 'FAILED' | 'RATE_LIMITED' | 'CANCELLED';
-
 export interface YouTubeUploadData {
     videoId: string;
     uploadedAt: string;
     title: string;
     description: string;
     videoUrl: string;
-    thumbnailUrl?: string;
 }
 
 export interface ProcessedVideoEntry {
@@ -21,4 +18,17 @@ export type StoredProcessedEntry = ProcessedVideoEntry | string;
 export interface QueueState {
     videoLinks: string[];
     videosProcessed: StoredProcessedEntry[];
+}
+
+export interface JobSummary {
+    status: 'pending' | 'completed' | 'failed';
+    ranAt: string | null;
+    manual?: boolean;
+    link?: string;
+    error?: string;
+    filePath?: string;
+}
+
+export interface DashboardData extends QueueState {
+    lastJobResult: JobSummary;
 }

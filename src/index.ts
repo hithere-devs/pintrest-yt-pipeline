@@ -1,18 +1,38 @@
 import 'dotenv/config';
 import express from 'express';
 import type { Request, Response } from 'express';
+import cors from 'cors';
 import cron from 'node-cron';
-import { loadQueue } from './dataStore';
+import { addVideoToQueue, saveUserTokens, getUserQueue, getUserHistory, deleteVideo } from './db';
 import { processNextVideo } from './processor';
 import type { ProcessorResult } from './processor';
 import {
+    updateVideoDetails,
     getAuthUrl,
     getTokensFromCode,
-    isAuthenticated,
 } from './youtubeUploader';
+import { requireAuth, AuthenticatedRequest } from './authMiddleware';
 
 const app = express();
+app.use(cors());
+app.use(express.json());
 const PORT = Number.parseInt(process.env.PORT ?? '4000', 10);
+
+// Cron Job Management
+let cronTask: cron.ScheduledTask;
+let currentSchedule = '* * * * *'; // Default: every minute
+let isQueuePaused = false;
+
+function startCron(schedule: string) {
+    if (cronTask) {
+        cronTask.stop();
+    }
+    currentSchedule = schedule;
+    cronTask = cron.schedule(schedule, () => {
+        void runJob();
+    });
+    console.log(`Cron job started with schedule: ${schedule}`);
+}
 
 interface PendingJobSummary {
     status: 'pending';
@@ -24,6 +44,10 @@ type JobSummary = (ProcessorResult & { ranAt: string | null; manual?: boolean })
 let lastJobResult: JobSummary = { status: 'pending', ranAt: null };
 
 async function runJob(): Promise<void> {
+    if (isQueuePaused) {
+        console.log('Queue is paused. Skipping job.');
+        return;
+    }
     const startedAt = new Date().toISOString();
     try {
         const result = await processNextVideo();
@@ -47,24 +71,61 @@ async function runJob(): Promise<void> {
     }
 }
 
-cron.schedule('* * * * *', () => {
-    void runJob();
-});
+startCron(currentSchedule);
 
 app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', lastJobResult });
 });
 
-app.get('/queue', async (_req: Request, res: Response) => {
-    const queue = await loadQueue();
-    res.json({
-        videoLinks: queue.videoLinks,
-        videosProcessed: queue.videosProcessed,
-        lastJobResult,
-    });
+// Protected Routes
+app.get('/queue', requireAuth, async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user!.id;
+    try {
+        const queue = await getUserQueue(userId);
+        const history = await getUserHistory(userId);
+
+        res.json({
+            queue,
+            history,
+            lastJobResult
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message, errorDetails: error });
+    }
 });
 
-app.get('/trigger-download', async (_req: Request, res: Response) => {
+app.post('/queue/add', requireAuth, async (req: Request, res: Response) => {
+    const { url } = req.body;
+    const userId = (req as AuthenticatedRequest).user!.id;
+
+    if (!url || typeof url !== 'string') {
+        return res.status(400).json({ error: 'Invalid URL' });
+    }
+
+    try {
+        const video = await addVideoToQueue(userId, url);
+        res.json({ success: true, video });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message, errorDetails: error });
+    }
+});
+
+app.delete('/queue/:videoId', requireAuth, async (req: Request, res: Response) => {
+    const { videoId } = req.params;
+    const userId = (req as AuthenticatedRequest).user!.id;
+
+    try {
+        await deleteVideo(userId, videoId);
+        res.json({ success: true });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message, errorDetails: error });
+    }
+});
+
+app.get('/trigger-download', requireAuth, async (_req: Request, res: Response) => {
     const manualResult = await processNextVideo();
     lastJobResult = {
         ...manualResult,
@@ -74,15 +135,47 @@ app.get('/trigger-download', async (_req: Request, res: Response) => {
     res.json(lastJobResult);
 });
 
-// YouTube OAuth2 routes
-app.get('/auth/youtube', (_req: Request, res: Response) => {
+// Settings Endpoints
+app.get('/settings', requireAuth, (_req: Request, res: Response) => {
+    res.json({
+        schedule: currentSchedule,
+        isQueuePaused
+    });
+});
+
+app.post('/settings', requireAuth, (req: Request, res: Response) => {
+    const { schedule, paused } = req.body;
+
+    if (schedule && cron.validate(schedule)) {
+        startCron(schedule);
+    }
+
+    if (typeof paused === 'boolean') {
+        isQueuePaused = paused;
+    }
+
+    res.json({ success: true, schedule: currentSchedule, isQueuePaused });
+});
+
+// Video Management
+app.put('/videos/:videoId', requireAuth, async (req: Request, res: Response) => {
+    const { videoId } = req.params;
+    const { title, description, tags } = req.body;
+    const userId = (req as AuthenticatedRequest).user!.id;
+
     try {
-        const authUrl = getAuthUrl();
-        res.redirect(authUrl);
+        await updateVideoDetails(videoId, { title, description, tags }, userId);
+        res.json({ success: true });
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         res.status(500).json({ error: message });
     }
+});
+
+// Google OAuth Routes
+app.get('/auth/youtube', (_req: Request, res: Response) => {
+    const authUrl = getAuthUrl();
+    res.redirect(authUrl);
 });
 
 app.get('/auth/youtube/callback', async (req: Request, res: Response) => {
@@ -93,25 +186,48 @@ app.get('/auth/youtube/callback', async (req: Request, res: Response) => {
     }
 
     try {
-        await getTokensFromCode(code);
-        res.send(
-            '<h1>YouTube Authorization Successful!</h1><p>You can close this window and return to the application.</p>'
-        );
-    } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        res.status(500).send(`<h1>Authorization Failed</h1><p>${message}</p>`);
-    }
-});
+        const tokens = await getTokensFromCode(code);
 
-app.get('/auth/youtube/status', (_req: Request, res: Response) => {
-    res.json({ authenticated: isAuthenticated() });
+        // Verify ID token to get user info
+        if (!tokens.id_token) {
+            throw new Error('No ID token received');
+        }
+
+        // We need to verify the ID token to get the user ID (sub)
+        // We can import verifyIdToken from youtubeUploader or just decode it if we trust the direct response from Google (which we can for this flow)
+        // But better to use the helper we just made
+        const { verifyIdToken, getChannelId } = await import('./youtubeUploader');
+        const payload = await verifyIdToken(tokens.id_token);
+
+        if (!payload || !payload.sub) {
+            throw new Error('Invalid ID token');
+        }
+
+        const userId = payload.sub;
+        const email = payload.email;
+
+        if (!email) {
+            throw new Error('Email not found in ID token');
+        }
+
+        // Get YouTube Channel ID
+        const youtubeId = await getChannelId(tokens);
+
+        // Save tokens to DB
+        await saveUserTokens(userId, tokens, email, youtubeId);
+
+        // Redirect to frontend with ID token
+        // In production, use a secure cookie or a separate frontend URL
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
+        res.redirect(`${frontendUrl}/?token=${tokens.id_token}&userId=${userId}&email=${email}`);
+
+    } catch (error: any) {
+        const message = error instanceof Error ? error.message : (JSON.stringify(error) || 'Unknown error');
+        console.error('Auth Error:', error);
+        res.status(500).send(`Authentication failed: ${message}`);
+    }
 });
 
 app.listen(PORT, () => {
-    console.log(`Pinterest downloader service listening on port ${PORT}`);
-    console.log(`YouTube auth status: ${isAuthenticated() ? 'Authenticated ✓' : 'Not authenticated ✗'}`);
-    if (!isAuthenticated()) {
-        console.log(`To authenticate with YouTube, visit: http://localhost:${PORT}/auth/youtube`);
-    }
-    void runJob();
+    console.log(`Server running on port ${PORT}`);
 });
