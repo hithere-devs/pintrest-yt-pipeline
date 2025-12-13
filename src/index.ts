@@ -23,6 +23,30 @@ import {
     type DbFrame,
     type DbResearchTask
 } from './db';
+import {
+    createAsset,
+    getAssetsByType,
+    getAssetById,
+    updateAsset,
+    deleteAsset,
+    searchAssets,
+    createProject,
+    getProjectById,
+    getProjectsByUser,
+    updateProject,
+    deleteProject,
+    createScheduledVideo,
+    getScheduledVideosByUser,
+    getPendingScheduledVideos,
+    updateScheduledVideo,
+    deleteScheduledVideo,
+    getProjectWithAssets,
+    type AssetType,
+    type DbAsset,
+    type DbViralVideoProject,
+    type DbScheduledVideo,
+    type CaptionSettings,
+} from './db/viralVideo';
 import { initializeDatabase } from './pgClient';
 import { processNextVideo } from './processor';
 import type { ProcessorResult } from './processor';
@@ -35,7 +59,7 @@ import { requireAuth, AuthenticatedRequest } from './authMiddleware';
 import { extractFrames, analyzeFrames, cleanupFrames, type ExtractedFrame } from './videoFrameAnalyzer';
 import { downloadPinterestMedia } from './pinterestDL';
 import { DeepResearch, type DeepResearchResult } from './deepResearch';
-import { uploadFrames, isS3Configured, deleteFramesFromS3 } from './s3Client';
+import { uploadFrames, isS3Configured, deleteFramesFromGCS as deleteFramesFromS3, uploadToS3 } from './gcsClient';
 
 const app = express();
 app.use(cors());
@@ -338,17 +362,17 @@ app.post('/frames/extract', requireAuth, async (req: Request, res: Response) => 
         }> = [];
 
         if (isS3Configured()) {
-            console.log('☁️ Uploading frames to S3...');
-            const s3Results = await uploadFrames(videoId, frames.map(f => ({
+            console.log('☁️ Uploading frames to GCS...');
+            const gcsResults = await uploadFrames(videoId, frames.map(f => ({
                 filePath: f.filePath,
                 index: f.index,
                 timestamp: f.timestamp
             })));
 
-            frameDataForDb = s3Results.map((s3Frame, idx) => ({
-                index: s3Frame.index,
-                timestamp: s3Frame.timestamp,
-                s3Url: s3Frame.s3Url,
+            frameDataForDb = gcsResults.map((gcsFrame, idx) => ({
+                index: gcsFrame.index,
+                timestamp: gcsFrame.timestamp,
+                s3Url: gcsFrame.gcsUrl,
                 localPath: frames[idx].filePath,
                 description: frames[idx].description
             }));
@@ -614,9 +638,8 @@ Please structure your response clearly with sections for Title, Description, Has
                     try {
                         const apiKey = process.env.GEMINI_API_KEY;
                         if (apiKey) {
-                            const { GoogleGenerativeAI } = await import('@google/generative-ai');
-                            const genAI = new GoogleGenerativeAI(apiKey);
-                            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+                            const { GoogleGenAI } = await import('@google/genai');
+                            const ai = new GoogleGenAI({ apiKey });
 
                             const extractionPrompt = `You are a YouTube content expert. Extract structured metadata from this research content for a YouTube video.
 
@@ -638,8 +661,16 @@ Extract and return a JSON object with these exact fields:
 
 Return ONLY the JSON object, no other text.`;
 
-                            const extractResult = await model.generateContent(extractionPrompt);
-                            const responseText = extractResult.response.text();
+                            const contents = [{ role: 'user', parts: [{ text: extractionPrompt }] }];
+                            const streamResult = await ai.models.generateContentStream({
+                                model: 'gemini-3-pro-preview',
+                                contents,
+                                config: { thinkingConfig: { thinkingLevel: 'HIGH' } }
+                            });
+                            let responseText = '';
+                            for await (const chunk of streamResult) {
+                                if (chunk.text) responseText += chunk.text;
+                            }
 
                             const extractedJson = responseText.match(/\{[\s\S]*\}/);
                             if (extractedJson) {
@@ -832,9 +863,8 @@ app.post('/research/extract', requireAuth, async (req: Request, res: Response) =
             return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
         }
 
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey });
 
         const extractionPrompt = `You are a YouTube content expert. Extract structured metadata from this research content for a YouTube video.
 
@@ -856,8 +886,16 @@ Extract and return a JSON object with these exact fields:
 
 Return ONLY the JSON object, no other text.`;
 
-        const result = await model.generateContent(extractionPrompt);
-        const responseText = result.response.text();
+        const contents = [{ role: 'user', parts: [{ text: extractionPrompt }] }];
+        const streamResult = await ai.models.generateContentStream({
+            model: 'gemini-3-pro-preview',
+            contents,
+            config: { thinkingConfig: { thinkingLevel: 'HIGH' } }
+        });
+        let responseText = '';
+        for await (const chunk of streamResult) {
+            if (chunk.text) responseText += chunk.text;
+        }
 
         // Parse the JSON from the response
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -958,7 +996,7 @@ app.post('/thumbnail/generate', requireAuth, async (req: Request, res: Response)
         const enhancedPrompt = `Generate a YouTube thumbnail image: high quality, professional photography, vibrant saturated colors, eye-catching composition, 16:9 aspect ratio, bold text-friendly layout, dramatic lighting. Subject: ${prompt}`;
 
         const config = {
-            responseModalities: ['IMAGE', 'TEXT'] as const,
+            responseModalities: ['IMAGE', 'TEXT'] as string[],
             imageConfig: {
                 imageSize: '1K' as const,
             },
@@ -1014,6 +1052,719 @@ app.post('/thumbnail/generate', requireAuth, async (req: Request, res: Response)
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         console.error('Thumbnail generation error:', error);
+        res.status(500).json({ error: message });
+    }
+});
+
+// ============= Viral Video Generator APIs =============
+
+// Get all assets by type (video, music, voice)
+app.get('/assets/:type', requireAuth, async (req: Request, res: Response) => {
+    const { type } = req.params;
+    const { search, tags } = req.query;
+
+    if (!['video', 'music', 'voice'].includes(type)) {
+        return res.status(400).json({ error: 'Invalid asset type. Must be video, music, or voice' });
+    }
+
+    try {
+        let assets: DbAsset[];
+        if (search || tags) {
+            const tagArray = tags ? (tags as string).split(',') : undefined;
+            assets = await searchAssets(type as AssetType, search as string, tagArray);
+        } else {
+            assets = await getAssetsByType(type as AssetType);
+        }
+        res.json({ assets });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Get single asset by ID
+app.get('/asset/:id', requireAuth, async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+        const asset = await getAssetById(id);
+        if (!asset) {
+            return res.status(404).json({ error: 'Asset not found' });
+        }
+        res.json({ asset });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Upload a new asset (admin endpoint - could add role check later)
+app.post('/assets', requireAuth, async (req: Request, res: Response) => {
+    const { type, name, description, s3Key, s3Url, thumbnailUrl, duration, metadata, tags } = req.body;
+
+    if (!type || !name || !s3Key || !s3Url) {
+        return res.status(400).json({ error: 'type, name, s3Key, and s3Url are required' });
+    }
+
+    if (!['video', 'music', 'voice'].includes(type)) {
+        return res.status(400).json({ error: 'Invalid asset type. Must be video, music, or voice' });
+    }
+
+    try {
+        const asset = await createAsset({
+            type,
+            name,
+            description,
+            s3Key,
+            s3Url,
+            thumbnailUrl,
+            duration,
+            metadata,
+            tags,
+        });
+        res.status(201).json({ asset });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Update an asset
+app.put('/asset/:id', requireAuth, async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const updates = req.body;
+
+    try {
+        const asset = await updateAsset(id, updates);
+        if (!asset) {
+            return res.status(404).json({ error: 'Asset not found' });
+        }
+        res.json({ asset });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Delete an asset
+app.delete('/asset/:id', requireAuth, async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+        await deleteAsset(id);
+        res.json({ success: true });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// ============= Viral Video Project APIs =============
+
+// Create a new project
+app.post('/viral/projects', requireAuth, async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user!.id;
+    const { name, backgroundVideoId, musicId } = req.body;
+
+    try {
+        const project = await createProject({
+            userId,
+            name,
+            backgroundVideoId,
+            musicId,
+        });
+        res.status(201).json({ project });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Get all projects for user
+app.get('/viral/projects', requireAuth, async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user!.id;
+    const { status } = req.query;
+
+    try {
+        const projects = await getProjectsByUser(userId, status as any);
+        res.json({ projects });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Get single project with assets
+app.get('/viral/project/:id', requireAuth, async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const userId = (req as AuthenticatedRequest).user!.id;
+
+    try {
+        const result = await getProjectWithAssets(id);
+        if (!result) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        // Verify ownership
+        if (result.project.userId !== userId) {
+            return res.status(403).json({ error: 'Not authorized to access this project' });
+        }
+
+        res.json(result);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Update a project
+app.put('/viral/project/:id', requireAuth, async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const userId = (req as AuthenticatedRequest).user!.id;
+    const updates = req.body;
+
+    try {
+        // Verify ownership first
+        const existing = await getProjectById(id);
+        if (!existing) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+        if (existing.userId !== userId) {
+            return res.status(403).json({ error: 'Not authorized to update this project' });
+        }
+
+        const project = await updateProject(id, updates);
+        res.json({ project });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Delete a project
+app.delete('/viral/project/:id', requireAuth, async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const userId = (req as AuthenticatedRequest).user!.id;
+
+    try {
+        const existing = await getProjectById(id);
+        if (!existing) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+        if (existing.userId !== userId) {
+            return res.status(403).json({ error: 'Not authorized to delete this project' });
+        }
+
+        await deleteProject(id);
+        res.json({ success: true });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// ============= Scheduled Video APIs =============
+
+// Create a scheduled video
+app.post('/viral/schedule', requireAuth, async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user!.id;
+    const { projectId, scheduledAt, youtubeTitle, youtubeDescription, youtubeTags, youtubePrivacy } = req.body;
+
+    if (!projectId || !scheduledAt) {
+        return res.status(400).json({ error: 'projectId and scheduledAt are required' });
+    }
+
+    try {
+        // Verify project ownership
+        const project = await getProjectById(projectId);
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+        if (project.userId !== userId) {
+            return res.status(403).json({ error: 'Not authorized to schedule this project' });
+        }
+
+        const scheduled = await createScheduledVideo({
+            projectId,
+            userId,
+            scheduledAt: new Date(scheduledAt),
+            youtubeTitle,
+            youtubeDescription,
+            youtubeTags,
+            youtubePrivacy,
+        });
+        res.status(201).json({ scheduled });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Get all scheduled videos for user
+app.get('/viral/schedules', requireAuth, async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user!.id;
+
+    try {
+        const schedules = await getScheduledVideosByUser(userId);
+        res.json({ schedules });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Update a scheduled video
+app.put('/viral/schedule/:id', requireAuth, async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const userId = (req as AuthenticatedRequest).user!.id;
+    const updates = req.body;
+
+    try {
+        // We don't have a direct getScheduledVideoById, so we'll update and check
+        const scheduled = await updateScheduledVideo(id, updates);
+        if (!scheduled) {
+            return res.status(404).json({ error: 'Scheduled video not found' });
+        }
+        if (scheduled.userId !== userId) {
+            return res.status(403).json({ error: 'Not authorized to update this schedule' });
+        }
+
+        res.json({ scheduled });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Delete a scheduled video
+app.delete('/viral/schedule/:id', requireAuth, async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+        await deleteScheduledVideo(id);
+        res.json({ success: true });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: message });
+    }
+});
+
+// Get available voice profiles (ElevenLabs voices)
+app.get('/viral/voices', requireAuth, async (_req: Request, res: Response) => {
+    // This will be populated from ElevenLabs API or pre-configured list
+    const voices = [
+        { id: 'stewie', name: 'Stewie Griffin', description: 'Intelligent, sarcastic baby voice', preview: null },
+        { id: 'peter', name: 'Peter Griffin', description: 'Lovable oaf with distinctive laugh', preview: null },
+        { id: 'narrator', name: 'Deep Narrator', description: 'Professional documentary style', preview: null },
+        { id: 'energetic', name: 'Energetic Host', description: 'High energy, enthusiastic', preview: null },
+        { id: 'calm', name: 'Calm Storyteller', description: 'Soothing, relaxed narration', preview: null },
+    ];
+    res.json({ voices });
+});
+
+// Generate viral script using Gemini (simple, fast)
+app.post('/viral/generate-script', requireAuth, async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user!.id;
+    const {
+        projectId,
+        topic,
+        format = 'monologue',
+        duration = 60,
+        voiceStyle = 'energetic',
+        targetAudience = 'general',
+        platform = 'youtube_shorts',
+        additionalContext,
+        speakers
+    } = req.body;
+
+    if (!topic) {
+        return res.status(400).json({ error: 'topic is required' });
+    }
+
+    try {
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+
+        const platformGuide = {
+            youtube_shorts: 'YouTube Shorts (under 60 seconds, vertical 9:16, hook in first 2 seconds)',
+            youtube: 'YouTube (longer form, can be horizontal)',
+            tiktok: 'TikTok (under 60 seconds, trendy, fast-paced)',
+            instagram_reels: 'Instagram Reels (under 90 seconds, visually appealing)',
+        }[platform] || 'short-form video';
+
+        const formatGuide = {
+            monologue: 'single narrator speaking directly to camera',
+            dialogue: `conversation between ${speakers?.length || 2} characters`,
+            narration: 'documentary-style narration over visuals',
+        }[format] || 'monologue';
+
+        const prompt = `Generate a viral ${platformGuide} script about: "${topic}"
+
+Format: ${formatGuide}
+Voice Style: ${voiceStyle}
+Target Duration: ${duration} seconds
+Target Audience: ${targetAudience}
+${additionalContext ? `Additional Context: ${additionalContext}` : ''}
+
+CRITICAL REQUIREMENTS:
+1. Start with a HOOK that grabs attention in the first 2 seconds
+2. Keep it engaging and fast-paced
+3. Use simple, conversational language
+4. End with a strong call-to-action
+5. Make it emotional/relatable
+
+IMPORTANT - TEXT FORMATTING RULES:
+- DO NOT use any emojis, emoticons, or special symbols (no 😀, 🔥, ❤️, etc.)
+- DO NOT use asterisks for emphasis (*word*)
+- DO NOT use hashtag symbols in the script text
+- Write numbers as words when spoken (e.g., "five" not "5")
+- Spell out abbreviations (e.g., "dollars" not "$")
+- Use plain English text only - this will be converted to speech
+- Avoid parenthetical expressions or stage directions
+- Each line should be natural spoken dialogue
+
+Return a JSON object with this exact structure:
+{
+  "script": "The full script text to be spoken - plain text only, no emojis or special characters",
+  "hookLine": "The opening hook line",
+  "callToAction": "The ending call to action",
+  "estimatedDuration": ${duration},
+  "suggestedMusic": "Type of background music that would work well",
+  "lines": [
+    {"speaker": "narrator", "text": "line text in plain spoken English", "emotion": "excited"}
+  ],
+  "hashtags": ["relevant", "hashtags"]
+}
+
+Only return valid JSON, no markdown or extra text.`;
+
+        const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+        const streamResult = await ai.models.generateContentStream({
+            model: 'gemini-3-pro-preview',
+            contents,
+            config: { thinkingConfig: { thinkingLevel: 'HIGH' } }
+        });
+        let responseText = '';
+        for await (const chunk of streamResult) {
+            if (chunk.text) responseText += chunk.text;
+        }
+
+        // Clean up response and parse JSON
+        let cleanJson = responseText.trim();
+        if (cleanJson.startsWith('```json')) {
+            cleanJson = cleanJson.slice(7);
+        }
+        if (cleanJson.startsWith('```')) {
+            cleanJson = cleanJson.slice(3);
+        }
+        if (cleanJson.endsWith('```')) {
+            cleanJson = cleanJson.slice(0, -3);
+        }
+        cleanJson = cleanJson.trim();
+
+        const scriptResult = JSON.parse(cleanJson);
+
+        // If projectId provided, update the project
+        if (projectId) {
+            await updateProject(projectId, {
+                scriptContent: scriptResult.script,
+                scriptType: format,
+                researchPrompt: topic,
+                researchResult: JSON.stringify(scriptResult),
+                status: 'draft',
+            });
+        }
+
+        res.json({
+            success: true,
+            script: scriptResult
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Script generation error:', error);
+        res.status(500).json({ error: message });
+    }
+});
+
+// Generate random viral video idea
+app.post('/viral/random-idea', requireAuth, async (req: Request, res: Response) => {
+    const { category } = req.body;
+
+    try {
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+
+        const categoryHint = category ? `in the category of "${category}"` : '';
+
+        const prompt = `Generate a unique, viral-worthy short video idea ${categoryHint} for YouTube Shorts/TikTok/Reels.
+
+The idea should be:
+- Attention-grabbing and scroll-stopping
+- Easy to produce with stock footage or simple visuals
+- Emotionally engaging (funny, shocking, inspiring, or educational)
+- Trending or evergreen topic
+
+Return ONLY a JSON object with this structure (no markdown, no extra text):
+{
+  "idea": "A catchy, specific video topic in 10-20 words",
+  "hook": "The opening line/hook for the video",
+  "category": "Category like: facts, motivation, humor, life-hacks, storytelling, mystery",
+  "viralPotential": "Why this could go viral in 1 sentence"
+}`;
+
+        const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+        const streamResult = await ai.models.generateContentStream({
+            model: 'gemini-3-pro-preview',
+            contents,
+            config: { thinkingConfig: { thinkingLevel: 'HIGH' } }
+        });
+        let responseText = '';
+        for await (const chunk of streamResult) {
+            if (chunk.text) responseText += chunk.text;
+        }
+
+        let cleanJson = responseText.trim();
+        if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
+        if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
+        if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
+        cleanJson = cleanJson.trim();
+
+        const idea = JSON.parse(cleanJson);
+
+        res.json({ success: true, ...idea });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Random idea generation error:', error);
+        res.status(500).json({ error: message });
+    }
+});
+
+// Generate voiceover from script
+app.post('/viral/generate-voiceover', requireAuth, async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user!.id;
+    const { projectId, script, voiceId, lines } = req.body;
+
+    if (!projectId || (!script && !lines)) {
+        return res.status(400).json({ error: 'projectId and (script or lines) are required' });
+    }
+
+    try {
+        // Verify project ownership
+        const project = await getProjectById(projectId);
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+        if (project.userId !== userId) {
+            return res.status(403).json({ error: 'Not authorized to modify this project' });
+        }
+
+        // Update status
+        await updateProject(projectId, { status: 'generating_voiceover' });
+
+        // Import TTS service
+        const { generateSpeechToS3, generateDialogue } = await import('./ttsService');
+
+        let result;
+        if (lines && Array.isArray(lines)) {
+            // Multi-speaker dialogue
+            result = await generateDialogue(lines, projectId);
+            // For dialogue, we'd need to concatenate the audio files
+            // For now, just return the first one
+            const firstResult = result[0];
+            await updateProject(projectId, {
+                voiceoverS3Key: firstResult.s3Key,
+                voiceoverS3Url: firstResult.s3Url,
+                voiceoverDuration: firstResult.duration,
+                voiceId: voiceId || 'narrator',
+                status: 'draft',
+            });
+            res.json({ success: true, voiceover: firstResult, allParts: result });
+        } else {
+            // Single voice with word-level timestamps
+            result = await generateSpeechToS3(script, voiceId || 'narrator', projectId);
+            await updateProject(projectId, {
+                voiceoverS3Key: result.s3Key,
+                voiceoverS3Url: result.s3Url,
+                voiceoverDuration: result.duration,
+                voiceId: voiceId || 'narrator',
+                wordTimings: result.wordTimings ? JSON.stringify(result.wordTimings) : null,
+                status: 'draft',
+            });
+            res.json({ success: true, voiceover: result });
+        }
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Voiceover generation error:', error);
+
+        // Update project status to failed
+        if (req.body.projectId) {
+            await updateProject(req.body.projectId, {
+                status: 'failed',
+                errorMessage: message
+            });
+        }
+
+        res.status(500).json({ error: message });
+    }
+});
+
+// Composite final video
+app.post('/viral/composite', requireAuth, async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user!.id;
+    const { projectId } = req.body;
+
+    if (!projectId) {
+        return res.status(400).json({ error: 'projectId is required' });
+    }
+
+    try {
+        // Get project with assets
+        const projectData = await getProjectWithAssets(projectId);
+        if (!projectData) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+        if (projectData.project.userId !== userId) {
+            return res.status(403).json({ error: 'Not authorized to modify this project' });
+        }
+
+        const { project, backgroundVideo, music } = projectData;
+
+        // Validate required assets
+        if (!backgroundVideo) {
+            return res.status(400).json({ error: 'Background video not selected' });
+        }
+        if (!project.voiceoverS3Url) {
+            return res.status(400).json({ error: 'Voiceover not generated' });
+        }
+
+        // Update status
+        await updateProject(projectId, { status: 'compositing' });
+
+        // Import compositor
+        const { compositeAndUpload } = await import('./videoCompositor');
+
+        // Parse script lines from research result
+        let scriptLines = [];
+        try {
+            const researchResult = project.researchResult ? JSON.parse(project.researchResult) : null;
+            scriptLines = researchResult?.lines || [];
+        } catch {
+            // If no lines, create a simple one from script content
+            if (project.scriptContent) {
+                scriptLines = [{ speaker: 'narrator', text: project.scriptContent }];
+            }
+        }
+
+        // Download assets to temp files for processing
+        const fs = await import('fs');
+        const path = await import('path');
+        const os = await import('os');
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'viral-composite-'));
+
+        // Download background video
+        const backgroundVideoPath = path.join(tempDir, 'background.mp4');
+        const bgResponse = await fetch(backgroundVideo.s3Url);
+        const bgBuffer = Buffer.from(await bgResponse.arrayBuffer());
+        fs.writeFileSync(backgroundVideoPath, bgBuffer);
+
+        // Download voiceover
+        const voiceoverPath = path.join(tempDir, 'voiceover.mp3');
+        console.log(`📥 Downloading voiceover from: ${project.voiceoverS3Url}`);
+        const voResponse = await fetch(project.voiceoverS3Url);
+        if (!voResponse.ok) {
+            throw new Error(`Failed to download voiceover: ${voResponse.status} ${voResponse.statusText}`);
+        }
+        const voBuffer = Buffer.from(await voResponse.arrayBuffer());
+        console.log(`   Voiceover downloaded: ${voBuffer.length} bytes`);
+        if (voBuffer.length === 0) {
+            throw new Error('Voiceover file is empty');
+        }
+        fs.writeFileSync(voiceoverPath, voBuffer);
+        console.log(`   Voiceover saved to: ${voiceoverPath}`);
+
+        // Download music if available
+        let musicPath: string | undefined;
+        if (music) {
+            musicPath = path.join(tempDir, 'music.mp3');
+            const musicResponse = await fetch(music.s3Url);
+            const musicBuffer = Buffer.from(await musicResponse.arrayBuffer());
+            fs.writeFileSync(musicPath, musicBuffer);
+        }
+
+        // Parse word timings if available
+        let wordTimings;
+        if (project.wordTimings) {
+            try {
+                wordTimings = JSON.parse(project.wordTimings);
+                console.log(`📝 Using ${wordTimings.length} word timings for precise caption sync`);
+            } catch {
+                console.log('⚠️ Could not parse word timings, using estimated timing');
+            }
+        }
+
+        // Composite video
+        const result = await compositeAndUpload({
+            backgroundVideoPath,
+            voiceoverPath,
+            musicPath,
+            captionSettings: project.captionSettings as any,
+            scriptLines,
+            wordTimings,
+        }, projectId);
+
+        // Cleanup temp files
+        try {
+            fs.unlinkSync(backgroundVideoPath);
+            fs.unlinkSync(voiceoverPath);
+            if (musicPath) fs.unlinkSync(musicPath);
+            fs.rmdirSync(tempDir);
+        } catch {
+            // Ignore cleanup errors
+        }
+
+        if (!result.success) {
+            throw new Error(result.error || 'Composition failed');
+        }
+
+        // Update project with final video
+        await updateProject(projectId, {
+            finalVideoS3Key: result.s3Key,
+            finalVideoS3Url: result.s3Url,
+            finalVideoDuration: result.duration,
+            status: 'completed',
+            completedAt: new Date().toISOString(),
+        });
+
+        res.json({ success: true, video: result });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Video composition error:', error);
+
+        await updateProject(projectId, {
+            status: 'failed',
+            errorMessage: message
+        });
+
+        res.status(500).json({ error: message });
+    }
+});
+
+// Research trending topics
+app.get('/viral/trending', requireAuth, async (req: Request, res: Response) => {
+    const { niche, platform, count } = req.query;
+
+    try {
+        const { researchTrendingTopics } = await import('./deepResearch');
+
+        const topics = await researchTrendingTopics({
+            niche: niche as string,
+            platform: platform as string,
+            count: count ? parseInt(count as string) : 5,
+        });
+
+        res.json({ topics });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
         res.status(500).json({ error: message });
     }
 });

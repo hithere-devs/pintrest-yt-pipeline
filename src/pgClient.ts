@@ -125,6 +125,74 @@ export async function initializeDatabase(): Promise<void> {
             )
         `);
 
+        // Create AssetLibrary table for videos, music, and voice profiles
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS "AssetLibrary" (
+                "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "type" TEXT NOT NULL CHECK ("type" IN ('video', 'music', 'voice')),
+                "name" TEXT NOT NULL,
+                "description" TEXT,
+                "s3Key" TEXT NOT NULL,
+                "s3Url" TEXT NOT NULL,
+                "thumbnailUrl" TEXT,
+                "duration" DECIMAL,
+                "metadata" JSONB DEFAULT '{}',
+                "tags" TEXT[],
+                "isActive" BOOLEAN DEFAULT true,
+                "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        `);
+
+        // Create ViralVideoProject table for tracking video generation projects
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS "ViralVideoProject" (
+                "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "userId" TEXT REFERENCES "User"("id"),
+                "status" TEXT NOT NULL DEFAULT 'draft' CHECK ("status" IN ('draft', 'generating_script', 'generating_voiceover', 'compositing', 'completed', 'failed', 'scheduled')),
+                "name" TEXT,
+                "backgroundVideoId" UUID REFERENCES "AssetLibrary"("id"),
+                "musicId" UUID REFERENCES "AssetLibrary"("id"),
+                "voiceId" TEXT,
+                "voiceName" TEXT,
+                "scriptContent" TEXT,
+                "scriptType" TEXT CHECK ("scriptType" IN ('monologue', 'dialogue', 'narration')),
+                "voiceoverS3Key" TEXT,
+                "voiceoverS3Url" TEXT,
+                "voiceoverDuration" DECIMAL,
+                "captionSettings" JSONB DEFAULT '{"font": "Montserrat", "fontSize": 48, "fontColor": "#FFFFFF", "strokeColor": "#000000", "strokeWidth": 2, "position": "bottom", "animation": "fade"}',
+                "finalVideoS3Key" TEXT,
+                "finalVideoS3Url" TEXT,
+                "finalVideoDuration" DECIMAL,
+                "researchPrompt" TEXT,
+                "researchResult" TEXT,
+                "errorMessage" TEXT,
+                "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                "completedAt" TIMESTAMP WITH TIME ZONE
+            )
+        `);
+
+        // Create ScheduledVideo table for scheduling generated videos
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS "ScheduledVideo" (
+                "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "projectId" UUID REFERENCES "ViralVideoProject"("id") ON DELETE CASCADE,
+                "userId" TEXT REFERENCES "User"("id"),
+                "scheduledAt" TIMESTAMP WITH TIME ZONE NOT NULL,
+                "youtubeTitle" TEXT,
+                "youtubeDescription" TEXT,
+                "youtubeTags" TEXT[],
+                "youtubePrivacy" TEXT DEFAULT 'private' CHECK ("youtubePrivacy" IN ('public', 'private', 'unlisted')),
+                "youtubeVideoId" TEXT,
+                "youtubeUrl" TEXT,
+                "status" TEXT NOT NULL DEFAULT 'pending' CHECK ("status" IN ('pending', 'uploading', 'uploaded', 'failed')),
+                "errorMessage" TEXT,
+                "uploadedAt" TIMESTAMP WITH TIME ZONE,
+                "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        `);
+
         // Create indexes
         await client.query('CREATE INDEX IF NOT EXISTS "Video_userId_idx" ON "Video"("userId")');
         await client.query('CREATE INDEX IF NOT EXISTS "Video_status_idx" ON "Video"("status")');
@@ -132,6 +200,13 @@ export async function initializeDatabase(): Promise<void> {
         await client.query('CREATE INDEX IF NOT EXISTS "Frame_videoId_idx" ON "Frame"("videoId")');
         await client.query('CREATE INDEX IF NOT EXISTS "ResearchTask_videoId_idx" ON "ResearchTask"("videoId")');
         await client.query('CREATE INDEX IF NOT EXISTS "ResearchTask_status_idx" ON "ResearchTask"("status")');
+        await client.query('CREATE INDEX IF NOT EXISTS "AssetLibrary_type_idx" ON "AssetLibrary"("type")');
+        await client.query('CREATE INDEX IF NOT EXISTS "AssetLibrary_isActive_idx" ON "AssetLibrary"("isActive")');
+        await client.query('CREATE INDEX IF NOT EXISTS "ViralVideoProject_userId_idx" ON "ViralVideoProject"("userId")');
+        await client.query('CREATE INDEX IF NOT EXISTS "ViralVideoProject_status_idx" ON "ViralVideoProject"("status")');
+        await client.query('CREATE INDEX IF NOT EXISTS "ScheduledVideo_userId_idx" ON "ScheduledVideo"("userId")');
+        await client.query('CREATE INDEX IF NOT EXISTS "ScheduledVideo_scheduledAt_idx" ON "ScheduledVideo"("scheduledAt")');
+        await client.query('CREATE INDEX IF NOT EXISTS "ScheduledVideo_status_idx" ON "ScheduledVideo"("status")');
 
         console.log('Database schema initialized successfully');
     } finally {

@@ -4,6 +4,7 @@ node_modules/
 downloads/
 dist/
 youtube-config.json
+gcp-credentials.json
 youtube-tokens.json
 
 # PM2 logs and runtime files

@@ -5,22 +5,34 @@ import path from 'path';
 import { generateVideoMetadata } from './aiContentGenerator';
 import { getUserTokens } from './db';
 
-const CONFIG_PATH = path.join(__dirname, '..', 'youtube-config.json');
+const CONFIG_PATH = path.join(__dirname, '..', 'gcp-credentials.json');
 const TOKENS_PATH = path.join(__dirname, '..', 'youtube-tokens.json');
 
-// YouTube API scopes
+// Google OAuth scopes for YouTube, Profile, and GCS
 const SCOPES = [
-    'https://www.googleapis.com/auth/youtube.upload',
-    'https://www.googleapis.com/auth/youtube.readonly',
+    // User Profile
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
     'openid',
-    'email',
-    'profile'
+    // YouTube
+    'https://www.googleapis.com/auth/youtube.upload',
+    'https://www.googleapis.com/auth/youtube',
+    'https://www.googleapis.com/auth/youtube.readonly',
+    // GCS (optional - for user-specific storage)
+    'https://www.googleapis.com/auth/devstorage.read_write',
 ];
 
-interface YouTubeConfig {
-    clientId: string;
-    clientSecret: string;
-    redirectUri: string;
+interface GCPCredentials {
+    web: {
+        client_id: string;
+        project_id: string;
+        auth_uri: string;
+        token_uri: string;
+        auth_provider_x509_cert_url: string;
+        client_secret: string;
+        redirect_uris: string[];
+        javascript_origins: string[];
+    };
 }
 
 export interface YouTubeTokens {
@@ -41,12 +53,12 @@ interface VideoMetadata {
 }
 
 /**
- * Load YouTube OAuth2 configuration
+ * Load GCP OAuth2 configuration
  */
-function loadConfig(): YouTubeConfig {
+function loadConfig(): GCPCredentials {
     if (!fs.existsSync(CONFIG_PATH)) {
         throw new Error(
-            'YouTube config not found. Copy youtube-config.example.json to youtube-config.json and add your credentials.'
+            'GCP credentials not found. Create gcp-credentials.json with your OAuth2 credentials from Google Cloud Console.'
         );
     }
     return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
@@ -57,10 +69,15 @@ function loadConfig(): YouTubeConfig {
  */
 export function createOAuth2Client(tokens?: YouTubeTokens): OAuth2Client {
     const config = loadConfig();
+    const { web } = config;
+
+    // Use the first redirect URI or default
+    const redirectUri = web.redirect_uris[0] || 'http://localhost:4000/auth/youtube/callback';
+
     const oauth2Client = new google.auth.OAuth2(
-        config.clientId,
-        config.clientSecret,
-        config.redirectUri
+        web.client_id,
+        web.client_secret,
+        redirectUri
     );
 
     // Load saved tokens if available (legacy file support)
@@ -72,6 +89,14 @@ export function createOAuth2Client(tokens?: YouTubeTokens): OAuth2Client {
     }
 
     return oauth2Client;
+}
+
+/**
+ * Get GCP project ID
+ */
+export function getProjectId(): string {
+    const config = loadConfig();
+    return config.web.project_id;
 }
 
 /**
@@ -273,9 +298,10 @@ export async function generateMetadata(
  */
 export async function verifyIdToken(idToken: string) {
     const client = createOAuth2Client();
+    const config = loadConfig();
     const ticket = await client.verifyIdToken({
         idToken,
-        audience: loadConfig().clientId,
+        audience: config.web.client_id,
     });
     return ticket.getPayload();
 }

@@ -7,7 +7,7 @@ import {
     resetVideoForRetry,
     markVideoPermanentlyFailed,
     MAX_RETRIES,
-    DbVideo
+    type DbVideo
 } from './db';
 import { downloadPinterestMedia } from './pinterestDL';
 import {

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import type { PinterestMetadata } from './pinterestDL';
 import { getDeepResearch } from './deepResearch';
 
@@ -63,8 +63,7 @@ export async function generateVideoMetadata(
     }
 
     try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        const ai = new GoogleGenAI({ apiKey });
 
         // Build context from Pinterest metadata
         let contextInfo = '';
@@ -161,9 +160,33 @@ Your response MUST be in a single, clean JSON block with no extra text before or
 }
 `;
 
-        const result = await model.generateContent(prompt);
-        const response = result.response;
-        const text = response.text();
+        const contents = [
+            {
+                role: 'user',
+                parts: [
+                    {
+                        text: prompt,
+                    },
+                ],
+            },
+        ];
+
+        const streamResult = await ai.models.generateContentStream({
+            model: 'gemini-3-pro-preview',
+            contents,
+            config: {
+                thinkingConfig: {
+                    thinkingLevel: 'HIGH',
+                },
+            },
+        });
+
+        let text = '';
+        for await (const chunk of streamResult) {
+            if (chunk.text) {
+                text += chunk.text;
+            }
+        }
 
         // Extract JSON from response (handle markdown code blocks)
         const jsonMatch = text.match(/\{[\s\S]*\}/);

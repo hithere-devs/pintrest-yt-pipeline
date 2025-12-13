@@ -384,6 +384,199 @@ Return as JSON:
     }
 
     /**
+     * Generate a viral video script using deep research
+     *
+     * @param params - Script generation parameters
+     * @returns Structured script content with timing and speaker info
+     */
+    async generateViralScript(params: {
+        topic: string;
+        format: 'monologue' | 'dialogue' | 'narration';
+        duration?: number; // target duration in seconds
+        voiceStyle?: string; // e.g., 'energetic', 'calm', 'dramatic', 'humorous'
+        targetAudience?: string;
+        platform?: 'youtube_shorts' | 'youtube' | 'tiktok' | 'instagram_reels';
+        additionalContext?: string;
+        speakers?: Array<{ id: string; name: string; personality: string }>;
+    }): Promise<{
+        script: string;
+        lines: Array<{
+            speaker: string;
+            text: string;
+            timing?: { start: number; end: number };
+            emotion?: string;
+        }>;
+        estimatedDuration: number;
+        suggestedMusic: string;
+        hookLine: string;
+        callToAction: string;
+    }> {
+        const {
+            topic,
+            format,
+            duration = 60,
+            voiceStyle = 'energetic',
+            targetAudience = 'general',
+            platform = 'youtube_shorts',
+            additionalContext,
+            speakers = [],
+        } = params;
+
+        const speakerInfo = speakers.length > 0
+            ? `\n\nSpeakers:\n${speakers.map(s => `- ${s.name} (${s.id}): ${s.personality}`).join('\n')}`
+            : format === 'dialogue'
+                ? '\n\nSpeakers:\n- Host: Energetic and engaging\n- Expert: Knowledgeable and informative'
+                : '';
+
+        const platformGuidelines: Record<string, string> = {
+            youtube_shorts: 'under 60 seconds, vertical format, hook in first 3 seconds, fast-paced',
+            youtube: 'can be longer, hook in first 10 seconds, good pacing with variety',
+            tiktok: 'under 60 seconds, trendy, use popular sounds/trends references, very fast hook',
+            instagram_reels: 'under 90 seconds, visually oriented, lifestyle focused',
+        };
+
+        const query = `You are a viral content scriptwriter specializing in engaging short-form video content.
+
+Generate a ${format} script for a viral video about: "${topic}"
+
+Requirements:
+- Target duration: approximately ${duration} seconds
+- Voice style: ${voiceStyle}
+- Target audience: ${targetAudience}
+- Platform: ${platform} (${platformGuidelines[platform] || 'engaging content'})
+${speakerInfo}
+${additionalContext ? `\nAdditional context: ${additionalContext}` : ''}
+
+The script must:
+1. Start with an attention-grabbing hook (first 3-5 seconds are crucial)
+2. Maintain engagement throughout with interesting facts or emotional hooks
+3. End with a strong call to action
+4. Be written in a ${voiceStyle} tone
+5. Be natural for text-to-speech (avoid complex punctuation, use pauses with "...")
+
+Return your response as JSON in this exact format:
+{
+    "script": "The complete script as a single string with speaker names if dialogue",
+    "lines": [
+        {
+            "speaker": "narrator or speaker id",
+            "text": "The actual line text",
+            "emotion": "neutral/excited/curious/dramatic/etc"
+        }
+    ],
+    "estimatedDuration": <number in seconds>,
+    "suggestedMusic": "Description of music style that would complement this script",
+    "hookLine": "The opening hook line",
+    "callToAction": "The closing call to action"
+}
+
+Research the topic thoroughly to include accurate, interesting information that will make the video engaging and shareable.`;
+
+        const result = await this.research(query, {
+            timeout: 3 * 60 * 1000, // 3 minutes for script generation
+        });
+
+        if (result.status === 'failed') {
+            throw new Error(result.error || 'Script generation failed');
+        }
+
+        try {
+            // Extract JSON from the result
+            const jsonMatch = result.result?.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error('No JSON found in response');
+            }
+
+            const parsed = JSON.parse(jsonMatch[0]);
+
+            return {
+                script: parsed.script || '',
+                lines: parsed.lines || [],
+                estimatedDuration: parsed.estimatedDuration || duration,
+                suggestedMusic: parsed.suggestedMusic || 'Upbeat background music',
+                hookLine: parsed.hookLine || '',
+                callToAction: parsed.callToAction || 'Follow for more!',
+            };
+        } catch (parseError) {
+            // If JSON parsing fails, try to create a structured response from raw text
+            const rawScript = result.result || '';
+            const lines = rawScript.split('\n').filter(l => l.trim()).map(text => ({
+                speaker: 'narrator',
+                text: text.trim(),
+            }));
+
+            return {
+                script: rawScript,
+                lines,
+                estimatedDuration: duration,
+                suggestedMusic: 'Upbeat background music',
+                hookLine: lines[0]?.text || '',
+                callToAction: 'Follow for more!',
+            };
+        }
+    }
+
+    /**
+     * Research trending topics for viral content
+     */
+    async researchTrendingTopics(params?: {
+        niche?: string;
+        platform?: string;
+        count?: number;
+    }): Promise<Array<{
+        topic: string;
+        whyViral: string;
+        suggestedAngle: string;
+        estimatedEngagement: 'high' | 'medium' | 'low';
+    }>> {
+        const { niche = 'general', platform = 'youtube_shorts', count = 5 } = params || {};
+
+        const query = `You are a viral content researcher specializing in ${platform} trends.
+
+Research and identify ${count} currently trending or evergreen viral topics ${niche !== 'general' ? `in the ${niche} niche` : ''}.
+
+For each topic provide:
+1. The topic/trend name
+2. Why it's going viral (psychology, timing, relevance)
+3. A unique angle to approach it
+4. Expected engagement level
+
+Return your response as JSON array:
+[
+    {
+        "topic": "topic name",
+        "whyViral": "explanation of viral potential",
+        "suggestedAngle": "unique approach to stand out",
+        "estimatedEngagement": "high/medium/low"
+    }
+]
+
+Focus on topics that:
+- Have proven engagement on ${platform}
+- Can be created with satisfying/ASMR background videos
+- Work well with voiceover narration
+- Have room for unique takes`;
+
+        const result = await this.research(query, {
+            timeout: 2 * 60 * 1000,
+        });
+
+        if (result.status === 'failed') {
+            throw new Error(result.error || 'Trending research failed');
+        }
+
+        try {
+            const jsonMatch = result.result?.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) {
+                throw new Error('No JSON array found in response');
+            }
+            return JSON.parse(jsonMatch[0]);
+        } catch {
+            return [];
+        }
+    }
+
+    /**
      * Get a research task by ID
      */
     getTask(taskId: string): DeepResearchResult | undefined {
@@ -466,4 +659,50 @@ export async function researchVideoMetadata(params: {
 }> {
     const dr = getDeepResearch();
     return dr.researchVideoContent(params);
+}
+
+/**
+ * Generate a viral video script
+ */
+export async function generateViralScript(params: {
+    topic: string;
+    format: 'monologue' | 'dialogue' | 'narration';
+    duration?: number;
+    voiceStyle?: string;
+    targetAudience?: string;
+    platform?: 'youtube_shorts' | 'youtube' | 'tiktok' | 'instagram_reels';
+    additionalContext?: string;
+    speakers?: Array<{ id: string; name: string; personality: string }>;
+}): Promise<{
+    script: string;
+    lines: Array<{
+        speaker: string;
+        text: string;
+        timing?: { start: number; end: number };
+        emotion?: string;
+    }>;
+    estimatedDuration: number;
+    suggestedMusic: string;
+    hookLine: string;
+    callToAction: string;
+}> {
+    const dr = getDeepResearch();
+    return dr.generateViralScript(params);
+}
+
+/**
+ * Research trending topics for viral content
+ */
+export async function researchTrendingTopics(params?: {
+    niche?: string;
+    platform?: string;
+    count?: number;
+}): Promise<Array<{
+    topic: string;
+    whyViral: string;
+    suggestedAngle: string;
+    estimatedEngagement: 'high' | 'medium' | 'low';
+}>> {
+    const dr = getDeepResearch();
+    return dr.researchTrendingTopics(params);
 }

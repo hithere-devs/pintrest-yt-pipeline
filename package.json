@@ -9,6 +9,7 @@
 		"start": "node dist/index.js",
 		"dev": "tsx watch src/index.ts",
 		"clean": "rimraf dist",
+		"upload-bg-videos": "tsx scripts/upload-background-videos.ts",
 		"pm2:start": "pm2 start ecosystem.config.js",
 		"pm2:stop": "pm2 stop pinterest-youtube-pipeline",
 		"pm2:restart": "pm2 restart pinterest-youtube-pipeline",
@@ -29,6 +30,7 @@
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.948.0",
 		"@aws-sdk/s3-request-presigner": "^3.948.0",
+		"@google-cloud/storage": "^7.18.0",
 		"@google/genai": "^1.33.0",
 		"@google/generative-ai": "^0.24.1",
 		"@supabase/supabase-js": "^2.84.0",

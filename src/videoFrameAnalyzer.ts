@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 
 export interface ExtractedFrame {
     index: number;
@@ -162,8 +162,7 @@ export async function analyzeFrames(frames: ExtractedFrame[]): Promise<Extracted
         return frames;
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const ai = new GoogleGenAI({ apiKey });
 
     const analyzedFrames: ExtractedFrame[] = [];
 
@@ -174,24 +173,37 @@ export async function analyzeFrames(frames: ExtractedFrame[]): Promise<Extracted
             const base64Image = imageData.toString('base64');
             const mimeType = frame.filePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
-            const result = await model.generateContent([
+            const contents = [
                 {
-                    inlineData: {
-                        mimeType,
-                        data: base64Image,
-                    },
-                },
-                {
-                    text: `Describe this video frame in 1-2 sentences. Focus on:
+                    role: 'user',
+                    parts: [
+                        {
+                            inlineData: {
+                                mimeType,
+                                data: base64Image,
+                            },
+                        },
+                        {
+                            text: `Describe this video frame in 1-2 sentences. Focus on:
 1. What is shown (food, Islamic scene, people, etc.)
 2. The mood/atmosphere
 3. Any text or key elements visible
 
 Keep the description concise and factual.`
+                        },
+                    ],
                 },
-            ]);
+            ];
 
-            const description = result.response.text();
+            const streamResult = await ai.models.generateContentStream({
+                model: 'gemini-3-pro-preview',
+                contents,
+                config: { thinkingConfig: { thinkingLevel: 'HIGH' } }
+            });
+            let description = '';
+            for await (const chunk of streamResult) {
+                if (chunk.text) description += chunk.text;
+            }
             analyzedFrames.push({
                 ...frame,
                 description,
