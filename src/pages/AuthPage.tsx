@@ -181,12 +181,18 @@ export default function AuthPage() {
 					{/* Mobile Header */}
 					<motion.div
 						variants={fadeInUp}
-						className='lg:hidden flex flex-col items-center mb-12'
+						className='lg:hidden flex flex-col items-center mb-12 select-none'
 					>
-						<div className='w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center mb-4'>
-							<Sparkles className='w-6 h-6 text-white' />
+						<div className='flex flex-col items-center justify-center gap-2'>
+							<img
+								src={logoLight}
+								alt='Clipmil Logo'
+								className='h-20 pointer-events-none'
+							/>
+							<span className='text-3xl font-display font-bold text-white tracking-tight'>
+								Clipmil
+							</span>
 						</div>
-						<h1 className='text-2xl font-bold text-white'>Clipmil</h1>
 					</motion.div>
 
 					{/* Auth Card */}
@@ -208,11 +214,11 @@ export default function AuthPage() {
 							>
 								<img
 									src='https://www.svgrepo.com/show/475656/google-color.svg'
-									className='w-5 h-5'
+									className='w-5 h-5 shrink-0'
 									alt='Google'
 								/>
-								<span>Continue with Google</span>
-								<ArrowRight className='w-4 h-4 ml-auto opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all' />
+								<span className='whitespace-nowrap'>Continue with Google</span>
+								<ArrowRight className='w-4 h-4 ml-auto opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all shrink-0' />
 							</button>
 						</motion.div>
 
