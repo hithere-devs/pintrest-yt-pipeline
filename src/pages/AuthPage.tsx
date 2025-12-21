@@ -10,6 +10,7 @@ import {
 	Brain,
 	ChevronLeft,
 } from 'lucide-react';
+import logoLight from '../assets/logo-light-trans.png';
 
 // --- Animation Variants ---
 const fadeInUp: Variants = {
@@ -43,8 +44,8 @@ const scaleIn: Variants = {
 function AnimatedGradient() {
 	return (
 		<div className='absolute inset-0 overflow-hidden pointer-events-none select-none'>
-			<div className='absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-coral/10 rounded-full blur-[120px] opacity-40 mix-blend-screen' />
-			<div className='absolute bottom-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[100px] opacity-30 mix-blend-screen' />
+			<div className='absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-emerald-500/10 rounded-full blur-[120px] opacity-40 mix-blend-screen' />
+			<div className='absolute bottom-0 right-0 w-[600px] h-[600px] bg-lime-500/5 rounded-full blur-[100px] opacity-30 mix-blend-screen' />
 		</div>
 	);
 }
@@ -61,7 +62,7 @@ function FeatureBadge({
 			variants={fadeInUp}
 			className='flex items-center gap-2 px-3 py-1.5 rounded-full bg-dark-card/50 border border-dark-border backdrop-blur-sm'
 		>
-			<Icon className='w-3.5 h-3.5 text-coral' />
+			<Icon className='w-3.5 h-3.5 text-emerald-500' />
 			<span className='text-xs text-gray-400'>{text}</span>
 		</motion.div>
 	);
@@ -95,12 +96,14 @@ export default function AuthPage() {
 						<span className='text-sm font-medium'>Back to home</span>
 					</Link>
 
-					<div className='flex items-center gap-3'>
-						<div className='w-10 h-10 rounded-xl bg-linear-to-br from-coral to-coral-dark flex items-center justify-center shadow-lg shadow-coral/20'>
-							<Sparkles className='w-5 h-5 text-white' />
-						</div>
-						<span className='text-2xl font-bold text-white tracking-tight'>
-							ClipForge
+					<div className='flex items-center -ml-8 select-none'>
+						<img
+							src={logoLight}
+							alt='Clipmil Logo'
+							className='h-24 pointer-events-none'
+						/>
+						<span className='text-3xl font-display font-bold text-white tracking-tight -ml-4'>
+							Clipmil
 						</span>
 					</div>
 				</motion.div>
@@ -114,10 +117,10 @@ export default function AuthPage() {
 						variants={fadeInUp}
 						className='text-4xl xl:text-6xl font-bold text-white leading-[1.1]'
 					>
-						Transform your videos
+						Create your content
 						<br />
-						<span className='text-transparent bg-clip-text bg-linear-to-r from-coral to-coral-light'>
-							into viral content.
+						<span className='text-transparent bg-clip-text bg-linear-to-r from-emerald-400 to-lime-400'>
+							into viral videos.
 						</span>
 					</motion.h1>
 
@@ -125,18 +128,18 @@ export default function AuthPage() {
 						variants={fadeInUp}
 						className='text-lg text-gray-400 max-w-md leading-relaxed'
 					>
-						Join thousands of creators using AI to analyze, optimize, and
-						generate content that performs.
+						Join the new class of creators building their audience. Automate,
+						analyze, and scale your video production.
 					</motion.p>
 
 					<motion.div
 						variants={staggerContainer}
 						className='flex flex-wrap gap-3'
 					>
-						<FeatureBadge icon={Brain} text='AI Analysis' />
-						<FeatureBadge icon={Video} text='Smart Clipping' />
-						<FeatureBadge icon={Zap} text='Instant Export' />
-						<FeatureBadge icon={Shield} text='Secure' />
+						<FeatureBadge icon={Brain} text='Trend Prediction' />
+						<FeatureBadge icon={Video} text='Video Creation' />
+						<FeatureBadge icon={Zap} text='High Velocity' />
+						<FeatureBadge icon={Shield} text='Creator Studio' />
 					</motion.div>
 				</motion.div>
 
@@ -159,7 +162,7 @@ export default function AuthPage() {
 							</p>
 						</div>
 						<p className='text-gray-500 text-xs'>
-							© 2025 ClipForge. All rights reserved.
+							© 2025 Clipmil. All rights reserved.
 						</p>
 					</div>
 				</motion.div>
@@ -172,7 +175,7 @@ export default function AuthPage() {
 				variants={staggerContainer}
 				className='flex-1 flex items-center justify-center p-8 relative'
 			>
-				<div className='absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,var(--tw-gradient-stops))] from-coral/5 via-dark-bg to-dark-bg pointer-events-none' />
+				<div className='absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,var(--tw-gradient-stops))] from-emerald-500/5 via-dark-bg to-dark-bg pointer-events-none' />
 
 				<div className='relative z-10 w-full max-w-md'>
 					{/* Mobile Header */}
@@ -180,10 +183,10 @@ export default function AuthPage() {
 						variants={fadeInUp}
 						className='lg:hidden flex flex-col items-center mb-12'
 					>
-						<div className='w-12 h-12 rounded-xl bg-coral flex items-center justify-center mb-4'>
+						<div className='w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center mb-4'>
 							<Sparkles className='w-6 h-6 text-white' />
 						</div>
-						<h1 className='text-2xl font-bold text-white'>ClipForge</h1>
+						<h1 className='text-2xl font-bold text-white'>Clipmil</h1>
 					</motion.div>
 
 					{/* Auth Card */}
@@ -193,7 +196,7 @@ export default function AuthPage() {
 					>
 						<motion.div variants={fadeInUp} className='text-center mb-8'>
 							<h2 className='text-2xl font-bold text-white mb-2'>
-								Welcome back
+								Creator Studio
 							</h2>
 							<p className='text-gray-400'>Sign in to access your dashboard</p>
 						</motion.div>

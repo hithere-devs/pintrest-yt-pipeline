@@ -1,22 +1,50 @@
 @import 'tailwindcss';
 
+/* Import DM Sans and Oxygen from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Oxygen:wght@300;400;700&display=swap');
+
+/* Clash Display Font Face */
+@font-face {
+	font-family: 'Clash Display';
+	src: url('./assets/ClashDisplay_Complete/Fonts/WEB/fonts/ClashDisplay-Variable.woff2')
+			format('woff2'),
+		url('./assets/ClashDisplay_Complete/Fonts/WEB/fonts/ClashDisplay-Variable.woff')
+			format('woff'),
+		url('./assets/ClashDisplay_Complete/Fonts/WEB/fonts/ClashDisplay-Regular.ttf')
+			format('truetype');
+	font-weight: 200 700;
+	font-display: swap;
+	font-style: normal;
+}
+
 @theme {
-	--font-sans: 'Plus Jakarta Sans', sans-serif;
+	/* Typography */
+	--font-sans: 'Oxygen', sans-serif;
+	--font-display: 'Clash Display', sans-serif;
 
-	/* Custom colors */
-	--color-coral: #d4634a;
-	--color-coral-light: #e88a76;
-	--color-coral-dark: #b84e38;
+	/* Brand Colors */
+	--color-emerald: #005c45;
+	--color-emerald-light: #008f5d;
+	--color-emerald-dark: #004a37;
 
-	/* Light mode backgrounds */
+	--color-lime: #ccff00;
+	--color-lime-hover: #b3e600;
+
+	/* Backgrounds */
 	--color-cream: #fdfbf7;
 	--color-cream-dark: #f3f0e9;
 
-	/* Dark mode colors */
+	/* Dark Mode */
 	--color-dark-bg: #0f0f0f;
 	--color-dark-card: #1a1a1a;
-	--color-dark-hover: #252525;
 	--color-dark-border: #2a2a2a;
+
+	/* Semantic mappings */
+	--color-primary: var(--color-emerald);
+	--color-primary-foreground: #ffffff;
+
+	--color-secondary: var(--color-lime);
+	--color-secondary-foreground: #000000;
 }
 
 /* Base styles */
@@ -30,13 +58,23 @@
 		@apply bg-cream text-gray-900 dark:bg-dark-bg dark:text-white;
 		transition: background-color 0.3s ease, color 0.3s ease;
 	}
+
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		font-family: var(--font-display);
+		@apply font-semibold tracking-tight;
+	}
 }
 
-/* Custom scrollbar */
+/* Custom Utilities */
 @layer utilities {
 	.scrollbar-thin {
 		scrollbar-width: thin;
-		scrollbar-color: #d4634a transparent;
+		scrollbar-color: var(--color-emerald) transparent;
 	}
 
 	.scrollbar-thin::-webkit-scrollbar {
@@ -48,13 +86,46 @@
 		background: transparent;
 	}
 
+	.bg-guilloche {
+		background-image: url('/pattern-guilloche.svg');
+		background-size: 60px 60px;
+	}
+
+	.text-money {
+		@apply font-display font-medium tracking-tight;
+	}
+
+	/* The "Buy Button" Effect */
+	.btn-money {
+		@apply relative overflow-hidden transition-all duration-200;
+		background: linear-gradient(
+			180deg,
+			var(--color-emerald) 0%,
+			var(--color-emerald-dark) 100%
+		);
+		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset,
+			0 4px 12px rgba(0, 92, 69, 0.3);
+	}
+
+	.btn-money:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset,
+			0 6px 16px rgba(0, 92, 69, 0.4);
+	}
+
+	.btn-money:active {
+		transform: translateY(1px);
+		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset,
+			0 2px 4px rgba(0, 92, 69, 0.3);
+	}
+
 	.scrollbar-thin::-webkit-scrollbar-thumb {
-		background-color: #d4634a;
+		background-color: var(--color-emerald);
 		border-radius: 3px;
 	}
 
 	.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-		background-color: #b84e38;
+		background-color: var(--color-emerald-dark);
 	}
 }
 
