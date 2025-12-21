@@ -385,117 +385,117 @@ function HeroSection() {
 	);
 }
 
-function SocialProof() {
-	return (
-		<section className='py-12 border-y border-white/5 bg-black'>
-			<div className='max-w-7xl mx-auto px-6'>
-				<div className='text-center mb-8'>
-					<h3 className='text-lg font-medium text-gray-500 font-sans'>
-						Powering the Creator Economy
-					</h3>
-				</div>
-				<div className='grid grid-cols-1 md:grid-cols-3 gap-8 text-center'>
-					<div>
-						<div className='text-5xl font-bold text-white font-display mb-2'>
-							10M+
-						</div>
-						<div className='text-emerald-500 font-medium font-sans'>
-							Views Generated
-						</div>
-					</div>
-					<div>
-						<div className='text-5xl font-bold text-white font-display mb-2'>
-							50k+
-						</div>
-						<div className='text-emerald-500 font-medium font-sans'>
-							Videos Created
-						</div>
-					</div>
-					<div>
-						<div className='text-5xl font-bold text-white font-display mb-2'>
-							$2M+
-						</div>
-						<div className='text-emerald-500 font-medium font-sans'>
-							Creator Revenue Generated
-						</div>
-					</div>
-				</div>
-			</div>
-		</section>
-	);
-}
+// function SocialProof() {
+// 	return (
+// 		<section className='py-12 border-y border-white/5 bg-black'>
+// 			<div className='max-w-7xl mx-auto px-6'>
+// 				<div className='text-center mb-8'>
+// 					<h3 className='text-lg font-medium text-gray-500 font-sans'>
+// 						Powering the Creator Economy
+// 					</h3>
+// 				</div>
+// 				<div className='grid grid-cols-1 md:grid-cols-3 gap-8 text-center'>
+// 					<div>
+// 						<div className='text-5xl font-bold text-white font-display mb-2'>
+// 							10M+
+// 						</div>
+// 						<div className='text-emerald-500 font-medium font-sans'>
+// 							Views Generated
+// 						</div>
+// 					</div>
+// 					<div>
+// 						<div className='text-5xl font-bold text-white font-display mb-2'>
+// 							50k+
+// 						</div>
+// 						<div className='text-emerald-500 font-medium font-sans'>
+// 							Videos Created
+// 						</div>
+// 					</div>
+// 					<div>
+// 						<div className='text-5xl font-bold text-white font-display mb-2'>
+// 							$2M+
+// 						</div>
+// 						<div className='text-emerald-500 font-medium font-sans'>
+// 							Creator Revenue Generated
+// 						</div>
+// 					</div>
+// 				</div>
+// 			</div>
+// 		</section>
+// 	);
+// }
 
-function ProblemSection() {
-	return (
-		<section className='py-32 px-6 relative bg-black'>
-			<div className='max-w-7xl mx-auto'>
-				<div className='grid grid-cols-1 lg:grid-cols-2 gap-12 items-center'>
-					<motion.div
-						initial={{ opacity: 0, x: -50 }}
-						whileInView={{ opacity: 1, x: 0 }}
-						viewport={{ once: true }}
-						className='p-8 rounded-3xl bg-white/5 border border-white/10 grayscale opacity-70'
-					>
-						<h3 className='text-3xl font-bold text-gray-400 mb-4 font-display'>
-							Manual Creation
-						</h3>
-						<p className='text-gray-500 mb-6 font-sans text-lg'>
-							Every hour you spend editing is lost reach. The algorithm rewards
-							volume and consistency. While you labor over one video, the trend
-							moves on.
-						</p>
-						<ul className='space-y-3 text-gray-500 font-sans'>
-							<li className='flex items-center gap-2'>
-								<span className='text-red-500'>✕</span> 1 Video/Day
-							</li>
-							<li className='flex items-center gap-2'>
-								<span className='text-red-500'>✕</span> High Burnout
-							</li>
-							<li className='flex items-center gap-2'>
-								<span className='text-red-500'>✕</span> Linear Growth
-							</li>
-						</ul>
-					</motion.div>
+// function ProblemSection() {
+// 	return (
+// 		<section className='py-32 px-6 relative bg-black'>
+// 			<div className='max-w-7xl mx-auto'>
+// 				<div className='grid grid-cols-1 lg:grid-cols-2 gap-12 items-center'>
+// 					<motion.div
+// 						initial={{ opacity: 0, x: -50 }}
+// 						whileInView={{ opacity: 1, x: 0 }}
+// 						viewport={{ once: true }}
+// 						className='p-8 rounded-3xl bg-white/5 border border-white/10 grayscale opacity-70'
+// 					>
+// 						<h3 className='text-3xl font-bold text-gray-400 mb-4 font-display'>
+// 							Manual Creation
+// 						</h3>
+// 						<p className='text-gray-500 mb-6 font-sans text-lg'>
+// 							Every hour you spend editing is lost reach. The algorithm rewards
+// 							volume and consistency. While you labor over one video, the trend
+// 							moves on.
+// 						</p>
+// 						<ul className='space-y-3 text-gray-500 font-sans'>
+// 							<li className='flex items-center gap-2'>
+// 								<span className='text-red-500'>✕</span> 1 Video/Day
+// 							</li>
+// 							<li className='flex items-center gap-2'>
+// 								<span className='text-red-500'>✕</span> High Burnout
+// 							</li>
+// 							<li className='flex items-center gap-2'>
+// 								<span className='text-red-500'>✕</span> Linear Growth
+// 							</li>
+// 						</ul>
+// 					</motion.div>
 
-					<motion.div
-						initial={{ opacity: 0, x: 50 }}
-						whileInView={{ opacity: 1, x: 0 }}
-						viewport={{ once: true }}
-						className='p-8 rounded-3xl bg-emerald-900/10 border border-emerald-500/30 relative overflow-hidden'
-					>
-						<div className='absolute inset-0 bg-guilloche opacity-10' />
-						<div className='relative z-10'>
-							<h3 className='text-3xl font-bold text-white mb-4 font-display'>
-								Clipmil Automated
-							</h3>
-							<p className='text-gray-300 mb-6 font-sans text-lg'>
-								Stop acting like an editor; start acting like a media empire.
-								Scale your channel with automated content creation.
-							</p>
-							<ul className='space-y-3 text-white font-sans'>
-								<li className='flex items-center gap-2'>
-									<Check className='text-lime-500' size={18} /> 50 Videos/Day
-								</li>
-								<li className='flex items-center gap-2'>
-									<Check className='text-lime-500' size={18} /> Zero Fatigue
-								</li>
-								<li className='flex items-center gap-2'>
-									<Check className='text-lime-500' size={18} /> Exponential
-									Reach
-								</li>
-							</ul>
-						</div>
-					</motion.div>
-				</div>
-				<div className='text-center mt-16'>
-					<h2 className='text-4xl md:text-5xl font-bold text-white font-display'>
-						Manual Creation is a Bottleneck.
-					</h2>
-				</div>
-			</div>
-		</section>
-	);
-}
+// 					<motion.div
+// 						initial={{ opacity: 0, x: 50 }}
+// 						whileInView={{ opacity: 1, x: 0 }}
+// 						viewport={{ once: true }}
+// 						className='p-8 rounded-3xl bg-emerald-900/10 border border-emerald-500/30 relative overflow-hidden'
+// 					>
+// 						<div className='absolute inset-0 bg-guilloche opacity-10' />
+// 						<div className='relative z-10'>
+// 							<h3 className='text-3xl font-bold text-white mb-4 font-display'>
+// 								Clipmil Automated
+// 							</h3>
+// 							<p className='text-gray-300 mb-6 font-sans text-lg'>
+// 								Stop acting like an editor; start acting like a media empire.
+// 								Scale your channel with automated content creation.
+// 							</p>
+// 							<ul className='space-y-3 text-white font-sans'>
+// 								<li className='flex items-center gap-2'>
+// 									<Check className='text-lime-500' size={18} /> 50 Videos/Day
+// 								</li>
+// 								<li className='flex items-center gap-2'>
+// 									<Check className='text-lime-500' size={18} /> Zero Fatigue
+// 								</li>
+// 								<li className='flex items-center gap-2'>
+// 									<Check className='text-lime-500' size={18} /> Exponential
+// 									Reach
+// 								</li>
+// 							</ul>
+// 						</div>
+// 					</motion.div>
+// 				</div>
+// 				<div className='text-center mt-16'>
+// 					<h2 className='text-4xl md:text-5xl font-bold text-white font-display'>
+// 						Manual Creation is a Bottleneck.
+// 					</h2>
+// 				</div>
+// 			</div>
+// 		</section>
+// 	);
+// }
 
 function BentoGrid() {
 	return (
