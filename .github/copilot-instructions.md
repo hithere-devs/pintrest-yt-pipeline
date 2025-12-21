@@ -1,76 +1,121 @@
 ## Overview
 
-- Pinterest downloader service written in strict TypeScript (see
-  `tsconfig.json`), compiled to CommonJS, and executed via `src/index.ts`.
-- Express powers a tiny API while `node-cron` triggers the same processor every
-  two minutes; manual runs use `GET /trigger-download`.
-- Downloads are handled by a Python script (`scripts/pinterest_downloader.py`)
-  that runs in a virtual environment (`.venv/`).
+Pinterest-to-YouTube automation pipeline with a React dashboard. The backend
+(`src/`) is TypeScript/Express with PostgreSQL; the frontend (`ui/`) is Vite +
+React + Tailwind. Node-cron processes the queue every minute; Python handles
+actual Pinterest downloads.
 
-## Processing pipeline
+## Architecture
 
-- `processNextVideo` in `src/processor.ts` is the heart of the system: load the
-  queue, pick the first unprocessed link, download via Python → persist.
-- Respect the `isProcessing` guard when adding async work; it prevents
-  overlapping cron/manual jobs.
-- Always push completed downloads via `markProcessedEntry` so the queue stays
-  deduplicated.
+```
+┌─────────────┐    ┌──────────────────┐    ┌─────────────────┐    ┌───────────┐
+│  React UI   │───▶│  Express API     │───▶│  PostgreSQL     │    │  GCS/S3   │
+│  (ui/)      │    │  (src/index.ts)  │    │  (pgClient.ts)  │    │  Storage  │
+└─────────────┘    └────────┬─────────┘    └─────────────────┘    └───────────┘
+                            │
+           ┌────────────────┼────────────────┐
+           ▼                ▼                ▼
+    ┌────────────┐   ┌────────────┐   ┌────────────────┐
+    │ processor  │   │ Python DL  │   │ YouTube API    │
+    │ (cron job) │   │ (spawn)    │   │ (googleapis)   │
+    └────────────┘   └────────────┘   └────────────────┘
+```
 
-## Queue persistence
+**Key modules:**
 
-- Queue state lives in `data/data.json`; `src/dataStore.ts` normalises shape and
-  tolerates legacy string entries in `videosProcessed`.
-- If you extend `QueueState`, update `types.ts`, `normaliseQueue`, and any JSON
-  fixtures together.
-- Persistence writes pretty JSON with a trailing newline—keep that format to
-  avoid churn in diffs.
+- `src/processor.ts` — Heart of the system: picks next queued video, downloads
+  via Python, uploads to YouTube
+- `src/db.ts` — All video/user/frame CRUD operations against PostgreSQL
+- `src/db/viralVideo.ts` — Asset library and viral video project management
+- `src/pinterestDL.ts` — Spawns Python script, parses JSON response
+- `src/youtubeUploader.ts` — OAuth2 flow, video upload, metadata generation
+- `src/aiContentGenerator.ts` — Gemini AI for titles/descriptions (uses
+  `@google/genai`)
+- `src/deepResearch.ts` — Deep research via Gemini for enhanced content
 
-## Python downloader integration
+## Authentication & Authorization
 
-- `src/pinterestDL.ts` spawns `scripts/pinterest_downloader.py` via the Python
-  virtual environment (`.venv/bin/python`).
-- The Python script handles short URL resolution, HTML parsing, HLS playlist
-  processing, and file downloads.
-- Returns JSON with `{success: true, filePath: "path/to/file.mp4"}` on success
-  or `{success: false, error: "message"}` on failure.
-- Python dependencies: `requests`, `beautifulsoup4`, `tqdm` (see
-  `requirements.txt`).
-- Supports automatic audio/video merging with ffmpeg when separate tracks exist.
+- Google OAuth2 handles both YouTube access AND user identity
+- `src/authMiddleware.ts`: `requireAuth` middleware verifies JWT id_token
+- User ID = Google's `sub` claim; stored in `User.id` (TEXT, not UUID)
+- Frontend stores `auth_token` in localStorage; sends as `Bearer` header
+- All `/queue/*`, `/videos/*`, `/frames/*` endpoints are protected
 
-## Downloading assets
+## Data Layer
 
-- All downloads go to `downloads/` with ISO timestamp filenames
-  (`YYYY-MM-DDTHH-MM-SS.mp4`).
-- The Python script cleans up partial downloads on failure and handles multiple
-  HLS quality variants (720p → 540p → 360p → 240p).
-- If you modify download logic, edit `scripts/pinterest_downloader.py`, not the
-  TypeScript code.
+- PostgreSQL via `src/pgClient.ts`; schema in `supabase_schema.sql`
+- `Video` table tracks status: `QUEUED → PROCESSING → DOWNLOADED → UPLOADED` (or
+  `FAILED`)
+- Retry logic: failed videos retry up to `MAX_RETRIES=3` with exponential
+  backoff
+- Rate limit: 2-hour gap between uploads per user (YouTube quota protection)
+- Legacy `data/data.json` still exists but primary storage is PostgreSQL
 
-## Server surface
+## Processing Pipeline
 
-- `src/index.ts` exposes `/health`, `/queue`, and `/trigger-download`; responses
-  always include the cached `lastJobResult` with an ISO timestamp.
-- Cron schedule is currently `*/2 * * * *`; adjust in one place (`index.ts`) if
-  you need different cadence.
+The `processNextVideo()` function in `src/processor.ts`:
 
-## Developer workflow
+1. Checks `isProcessing` guard (prevents overlapping jobs)
+2. Fetches next `QUEUED` video or retries a `FAILED` one
+3. Rate-limits against `UPLOAD_RATE_LIMIT_MS` (2 hours)
+4. Spawns Python downloader → saves to `downloads/`
+5. Generates metadata via Gemini AI
+6. Uploads to YouTube with user's OAuth tokens
+7. Cleans up local file; updates DB status
 
-- Install tooling with `npm install` (Node 18+) and
-  `pip install -r requirements.txt` (Python 3.10+, in `.venv/`).
-- Run locally with `npm run dev` (tsx watch) or `npm run build && npm start` for
-  production parity.
-- Generated JavaScript lands in `dist/`; `npm run clean` uses `rimraf` to reset.
-- There are no automated tests yet—smoke the queue by editing `data/data.json`
-  and hitting `GET /trigger-download`.
+## Python Downloader
 
-## Common extension points
+- Script: `scripts/pinterest_downloader.py`
+- Spawned via: `.venv/bin/python` (virtual env required)
+- Returns JSON: `{success: true, filePath: "...", metadata: {...}}`
+- Handles: short URL resolution, HLS playlists, audio/video merging (ffmpeg)
+- Test standalone:
+  `.venv/bin/python scripts/pinterest_downloader.py <url> downloads`
 
-- New persistence fields should be surfaced through the `/queue` endpoint so UI
-  clients stay in sync.
-- When integrating YouTube uploads, hook in after `downloadPinterestMedia`
-  resolves and write any resulting IDs into `videosProcessed` entries.
-- Prefer adding helpers alongside existing modules (`src/processor.ts`,
-  `src/dataStore.ts`) to leverage their validation and error handling patterns.
-- For Python script changes, test with
-  `.venv/bin/python scripts/pinterest_downloader.py <url> downloads` before
-  integrating.
+## Developer Workflow
+
+```bash
+# Backend
+npm install && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+npm run dev          # tsx watch mode on :4000
+
+# Frontend
+cd ui && npm install && npm run dev   # Vite on :5173
+
+# Production
+npm run build && npm start   # or use PM2: ./start-pm2.sh
+```
+
+**Environment variables** (see `.env.example`):
+
+- `DATABASE_URL` — PostgreSQL connection string
+- `GEMINI_API_KEY` — Google Gemini for AI content
+- `GCS_BUCKET_NAME`, `GCS_PROJECT_ID` — Google Cloud Storage
+- `PORT` — API port (default 4000)
+
+## Code Conventions
+
+- Strict TypeScript (`tsconfig.json`); compiled to CommonJS in `dist/`
+- All DB functions use `query<T>()` / `queryOne<T>()` from `pgClient.ts`
+- New video statuses: add to `VideoStatus` union in `types.ts`
+- API responses include `lastJobResult` for UI polling
+- When extending DB schema: update both `pgClient.ts` (auto-migration) and
+  `supabase_schema.sql`
+
+## Frontend (ui/)
+
+- Vite + React 18 + TypeScript + Tailwind
+- `ui/src/api.ts`: `fetchWithAuth()` — wraps all API calls with auth token
+- `ui/src/context/AuthContext.tsx` — manages auth state, token verification
+- Pages: Dashboard, Queue, History, VideoDetail, ViralVideoGenerator
+- `VITE_API_URL` env var controls backend URL
+
+## Extension Points
+
+- **New API endpoint**: Add to `src/index.ts`, protect with `requireAuth`
+- **New video status**: Update `types.ts` → `db.ts` queries → UI components
+- **Cloud storage**: `gcsClient.ts` (GCS) or `s3Client.ts` (AWS) — both patterns
+  available
+- **AI features**: Extend `aiContentGenerator.ts` or use `DeepResearch` class
+- **Video processing**: Modify Python script, not TypeScript (`pinterestDL.ts`
+  is just a spawner)
