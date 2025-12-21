@@ -295,7 +295,7 @@ function HeroSection() {
 					initial={{ opacity: 0, y: 30 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.8, delay: 0.1 }}
-					className='text-6xl md:text-8xl lg:text-9xl font-bold text-white mb-8 tracking-tight leading-[1] font-display'
+					className='text-5xl md:text-8xl lg:text-9xl font-bold text-white mb-8 tracking-tight leading-[1] font-display'
 				>
 					Turn Ideas
 					<br />
@@ -308,7 +308,7 @@ function HeroSection() {
 					initial={{ opacity: 0, y: 30 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.8, delay: 0.2 }}
-					className='text-xl text-gray-400 mb-12 max-w-3xl mx-auto leading-relaxed font-sans'
+					className='text-lg md:text-xl text-gray-400 mb-12 max-w-3xl mx-auto leading-relaxed font-sans'
 				>
 					Clipmil is the high-velocity content engine for creators. Turn raw
 					concepts into engaging videos, predict viral potential with AI, Scale
@@ -508,7 +508,7 @@ function BentoGrid() {
 					variants={staggerContainer}
 					className='mb-16 text-center'
 				>
-					<h2 className='text-5xl md:text-6xl font-bold text-white mb-6 font-display'>
+					<h2 className='text-4xl md:text-6xl font-bold text-white mb-6 font-display'>
 						The Growth Engine
 					</h2>
 					<p className='text-gray-400 text-lg max-w-2xl mx-auto font-sans'>
@@ -561,7 +561,7 @@ function PipelineSection() {
 					variants={staggerContainer}
 					className='text-center mb-20'
 				>
-					<h2 className='text-5xl md:text-6xl font-bold text-white mb-6 font-display'>
+					<h2 className='text-4xl md:text-6xl font-bold text-white mb-6 font-display'>
 						Your Content Pipeline
 					</h2>
 					<p className='text-gray-400 text-lg max-w-2xl mx-auto font-sans'>
@@ -604,7 +604,7 @@ function PricingSection() {
 		<section id='plans' className='py-32 px-6 relative bg-black'>
 			<div className='max-w-7xl mx-auto'>
 				<div className='text-center mb-16'>
-					<h2 className='text-5xl md:text-6xl font-bold text-white mb-6 font-display'>
+					<h2 className='text-4xl md:text-6xl font-bold text-white mb-6 font-display'>
 						Choose Your Scale
 					</h2>
 					<p className='text-gray-400 text-lg max-w-2xl mx-auto font-sans'>
@@ -716,7 +716,7 @@ function CTASection() {
 
 				<motion.h2
 					variants={fadeInUp}
-					className='text-6xl md:text-8xl font-bold text-white mb-8 tracking-tighter font-display'
+					className='text-5xl md:text-8xl font-bold text-white mb-8 tracking-tighter font-display'
 				>
 					Ready to create
 					<br />
