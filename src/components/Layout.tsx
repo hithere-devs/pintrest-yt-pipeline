@@ -113,7 +113,10 @@ export default function Layout() {
 										Creator
 									</p>
 								</div>
-								<ChevronDown size={14} className='text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300' />
+								<ChevronDown
+									size={14}
+									className='text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300'
+								/>
 							</button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align='end' className='w-56'>
