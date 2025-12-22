@@ -348,25 +348,9 @@ export default function ViralVideoGeneratorPage() {
 	};
 
 	return (
-		<div className='min-h-screen bg-gray-50 dark:bg-dark-bg'>
-			{/* Header */}
-			<div className='bg-white dark:bg-dark-card border-b border-gray-200 dark:border-gray-800 px-6 py-4'>
-				<div className='flex items-center justify-between'>
-					<div>
-						<h1 className='text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2'>
-							<Wand2 className='w-7 h-7 text-coral' />
-							Viral Video Generator
-						</h1>
-						<p className='text-gray-500 dark:text-gray-400 mt-1'>
-							Create engaging videos with AI-powered scripts and professional
-							voiceovers
-						</p>
-					</div>
-				</div>
-			</div>
-
+		<div className='min-h-screen bg-gray-50 dark:bg-dark-bg pb-24'>
 			{/* Progress Steps */}
-			<div className='bg-white dark:bg-dark-card border-b border-gray-200 dark:border-gray-800 px-6 py-4'>
+			<div className='bg-white dark:bg-dark-card border-b border-gray-200 dark:border-gray-800 px-6 py-4 sticky top-0 z-20 shadow-sm'>
 				<div className='flex items-center justify-between max-w-4xl mx-auto'>
 					{STEPS.map((step, index) => {
 						const Icon = step.icon;
@@ -449,7 +433,11 @@ export default function ViralVideoGeneratorPage() {
 								{backgroundVideos.map((video) => (
 									<div
 										key={video.id}
-										onClick={() => setSelectedBackground(video)}
+										onClick={() => {
+											setSelectedBackground(video);
+											// Auto-advance to next step after selection
+											setTimeout(() => nextStep(), 300);
+										}}
 										className={`group relative aspect-[9/16] rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
 											selectedBackground?.id === video.id
 												? 'border-coral ring-2 ring-coral/30'
@@ -544,7 +532,7 @@ export default function ViralVideoGeneratorPage() {
 										<button
 											onClick={generateRandomIdea}
 											disabled={generatingIdea}
-											className='flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg transition-all disabled:opacity-50'
+											className='flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-all disabled:opacity-50 font-medium'
 										>
 											{generatingIdea ? (
 												<>
@@ -1193,23 +1181,30 @@ export default function ViralVideoGeneratorPage() {
 				)}
 
 				{/* Navigation */}
-				<div className='flex justify-between mt-12 pt-6 border-t border-gray-200 dark:border-gray-800'>
-					<button
-						onClick={prevStep}
-						disabled={currentStep === 1}
-						className='flex items-center gap-2 px-6 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed'
-					>
-						<ChevronLeft className='w-5 h-5' />
-						Previous
-					</button>
-					<button
-						onClick={nextStep}
-						disabled={currentStep === STEPS.length || !canProceed()}
-						className='flex items-center gap-2 px-6 py-3 bg-coral hover:bg-coral-light text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed'
-					>
-						{currentStep === STEPS.length ? 'Finish' : 'Next'}
-						<ChevronRight className='w-5 h-5' />
-					</button>
+				<div className='fixed bottom-0 left-0 right-0 lg:pl-20 bg-white/80 dark:bg-dark-card/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 p-4 z-30'>
+					<div className='max-w-6xl mx-auto flex justify-between items-center'>
+						<button
+							onClick={prevStep}
+							disabled={currentStep === 1}
+							className='flex items-center gap-2 px-6 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium'
+						>
+							<ChevronLeft className='w-5 h-5' />
+							Previous
+						</button>
+						
+						<div className='text-sm text-gray-500 font-medium hidden sm:block'>
+							Step {currentStep} of {STEPS.length}
+						</div>
+
+						<button
+							onClick={nextStep}
+							disabled={currentStep === STEPS.length || !canProceed()}
+							className='flex items-center gap-2 px-8 py-3 bg-coral hover:bg-coral-light text-white rounded-xl font-bold shadow-lg shadow-coral/20 hover:shadow-coral/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none'
+						>
+							{currentStep === STEPS.length ? 'Finish' : 'Next Step'}
+							<ChevronRight className='w-5 h-5' />
+						</button>
+					</div>
 				</div>
 			</div>
 
