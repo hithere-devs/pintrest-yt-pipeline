@@ -57,14 +57,17 @@ export default function Layout() {
 	return (
 		<div className='flex h-screen bg-cream dark:bg-dark-bg transition-colors duration-300'>
 			{/* Sidebar - Desktop */}
-			<aside className='hidden lg:flex w-64 flex-col p-4 border-r border-gray-100 dark:border-dark-border'>
+			<aside className='hidden lg:flex w-20 hover:w-64 flex-col p-4 border-r border-gray-100 dark:border-dark-border transition-all duration-300 group z-50 bg-cream dark:bg-dark-bg overflow-hidden'>
 				{/* Logo */}
 				<div className='flex items-center gap-3 px-2 mb-6'>
 					<img
 						src={theme === 'dark' ? logoLight : logoDark}
 						alt='Clipmil Logo'
-						className='h-7 w-auto'
+						className='h-7 w-auto shrink-0'
 					/>
+					<span className='font-display font-bold text-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap'>
+						Clipmil
+					</span>
 				</div>
 
 				{/* Navigation */}
@@ -74,15 +77,17 @@ export default function Layout() {
 							key={item.path}
 							to={item.path}
 							className={({ isActive }) =>
-								`flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 font-medium text-sm ${
+								`flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 font-medium text-sm whitespace-nowrap ${
 									isActive
 										? 'bg-coral text-white shadow-md shadow-coral/20'
-										: 'text-gray-500 hover:bg-cream-dark dark:text-gray-400 dark:hover:bg-dark-hover'
+										: 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
 								}`
 							}
 						>
-							<item.icon size={18} />
-							{item.label}
+							<item.icon size={20} className='shrink-0' />
+							<span className='opacity-0 group-hover:opacity-100 transition-opacity duration-300'>
+								{item.label}
+							</span>
 						</NavLink>
 					))}
 				</nav>
@@ -91,8 +96,8 @@ export default function Layout() {
 				<div className='mt-auto pt-4 border-t border-gray-100 dark:border-dark-border'>
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<button className='flex items-center gap-3 w-full text-left hover:bg-cream-dark dark:hover:bg-dark-hover p-2 rounded-xl transition-colors'>
-								<Avatar className='h-8 w-8 border border-coral/20'>
+							<button className='flex items-center gap-3 w-full text-left hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded-xl transition-colors'>
+								<Avatar className='h-8 w-8 border border-coral/20 shrink-0'>
 									<AvatarImage
 										src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`}
 									/>
@@ -100,7 +105,7 @@ export default function Layout() {
 										{user?.email?.substring(0, 2).toUpperCase()}
 									</AvatarFallback>
 								</Avatar>
-								<div className='flex-1 overflow-hidden'>
+								<div className='flex-1 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300'>
 									<p className='text-sm font-medium text-gray-900 dark:text-white truncate'>
 										{user?.email?.split('@')[0]}
 									</p>
@@ -108,7 +113,7 @@ export default function Layout() {
 										Creator
 									</p>
 								</div>
-								<ChevronDown size={14} className='text-gray-400' />
+								<ChevronDown size={14} className='text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300' />
 							</button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align='end' className='w-56'>

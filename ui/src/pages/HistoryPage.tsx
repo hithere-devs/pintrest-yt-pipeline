@@ -128,60 +128,48 @@ export default function HistoryPage() {
 
 	return (
 		<div className='space-y-6'>
-			{/* Header */}
-			<div className='flex flex-col md:flex-row md:items-center md:justify-between gap-4'>
-				<div>
-					<h2 className='text-2xl font-bold text-gray-900 dark:text-white'>
-						Processing History
-					</h2>
-					<p className='text-gray-500 dark:text-gray-400 text-sm mt-1'>
-						View all processed videos and their upload status
-					</p>
-				</div>
-				<div className='flex items-center gap-2'>
-					<Filter size={18} className='text-gray-400' />
-					<div className='flex bg-cream-dark dark:bg-dark-card rounded-xl p-1'>
-						<button
-							onClick={() => setFilter('all')}
-							className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-								filter === 'all'
-									? 'bg-white dark:bg-dark-hover text-gray-900 dark:text-white shadow-sm'
-									: 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-							}`}
-						>
-							All ({data.history.length})
-						</button>
-						<button
-							onClick={() => setFilter('uploaded')}
-							className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-								filter === 'uploaded'
-									? 'bg-white dark:bg-dark-hover text-gray-900 dark:text-white shadow-sm'
-									: 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-							}`}
-						>
-							Uploaded ({uploadedCount})
-						</button>
-						<button
-							onClick={() => setFilter('failed')}
-							className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-								filter === 'failed'
-									? 'bg-white dark:bg-dark-hover text-gray-900 dark:text-white shadow-sm'
-									: 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-							}`}
-						>
-							Failed ({failedCount})
-						</button>
-					</div>
-				</div>
-			</div>
-
 			{/* History Grid */}
 			<Card>
-				<CardHeader>
+				<CardHeader className='flex flex-row items-center justify-between'>
 					<CardTitle className='flex items-center gap-2'>
 						<Calendar className='text-coral' size={20} />
 						Video History
 					</CardTitle>
+					<div className='flex items-center gap-2'>
+						<Filter size={18} className='text-gray-400' />
+						<div className='flex bg-cream-dark dark:bg-dark-card rounded-xl p-1'>
+							<button
+								onClick={() => setFilter('all')}
+								className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+									filter === 'all'
+										? 'bg-white dark:bg-dark-hover text-gray-900 dark:text-white shadow-sm'
+										: 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+								}`}
+							>
+								All ({data.history.length})
+							</button>
+							<button
+								onClick={() => setFilter('uploaded')}
+								className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+									filter === 'uploaded'
+										? 'bg-white dark:bg-dark-hover text-gray-900 dark:text-white shadow-sm'
+										: 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+								}`}
+							>
+								Uploaded ({uploadedCount})
+							</button>
+							<button
+								onClick={() => setFilter('failed')}
+								className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+									filter === 'failed'
+										? 'bg-white dark:bg-dark-hover text-gray-900 dark:text-white shadow-sm'
+										: 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+								}`}
+							>
+								Failed ({failedCount})
+							</button>
+						</div>
+					</div>
 				</CardHeader>
 				<CardContent>
 					{filteredHistory.length === 0 ? (
@@ -199,7 +187,7 @@ export default function HistoryPage() {
 							</p>
 						</div>
 					) : (
-						<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+						<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
 							{filteredHistory.map((video) => (
 								<div
 									key={video.id}
