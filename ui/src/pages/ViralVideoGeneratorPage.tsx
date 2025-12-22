@@ -1191,7 +1191,7 @@ export default function ViralVideoGeneratorPage() {
 							<ChevronLeft className='w-5 h-5' />
 							Previous
 						</button>
-						
+
 						<div className='text-sm text-gray-500 font-medium hidden sm:block'>
 							Step {currentStep} of {STEPS.length}
 						</div>
