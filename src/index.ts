@@ -1159,6 +1159,189 @@ app.delete('/asset/:id', requireAuth, async (req: Request, res: Response) => {
     }
 });
 
+// ============= Caption Testing API =============
+
+// Generate a quick test video with caption settings
+// Uses hardcoded GCS URLs for testing caption styles
+app.post('/test/caption-preview', requireAuth, async (req: Request, res: Response) => {
+    // ============================================
+    // HARDCODED TEST VALUES - EDIT THESE DIRECTLY
+    // ============================================
+    const FONTSIZE = 16;           // ASS font size (try: 10-40)
+    const FONTNAME = 'Avenir Next';      // Font name
+    const PRIMARY_COLOUR = '&H00FFFFFF';  // White (ASS BGR format: &HAABBGGRR)
+    const OUTLINE_COLOUR = '&H00000000';  // Black outline
+    const BACK_COLOUR = '&H40000000';     // Semi-transparent black background
+    const OUTLINE = 2;             // Outline thickness (try: 1-4)
+    const SHADOW = 0;              // Shadow (0 = off)
+    const BOLD = 1;                // Bold (1 = on, 0 = off)
+    const ALIGNMENT = 2;           // 1-9 numpad layout (2=bottom-center, 5=center, 8=top-center)
+    const MARGIN_L = 20;           // Left margin
+    const MARGIN_R = 20;           // Right margin
+    const MARGIN_V = 200;          // Vertical margin from anchor point
+
+    // Hardcoded URLs
+    const VIDEO_URL = 'https://storage.googleapis.com/video-pipeline-assets/assets/videos/minecraft-parkour.mp4';
+    const AUDIO_URL = 'https://storage.googleapis.com/video-pipeline-assets/voiceovers/8173aedf-0fb1-4ed0-8a81-fdab06ba07b0/1766334884727.mp3';
+
+    const WORDS_PER_CAPTION = 4;
+
+    // Script lines for captions (from the voiceover)
+    const SCRIPT = [
+        "This beautiful green dress was actually killing the woman wearing it.",
+        "In the Victorian era a new dye called Paris Green became the ultimate fashion obsession.",
+        "It was vibrant and bright and even glowed under gaslight.",
+        "But there was a deadly secret because to get that color dressmakers used massive amounts of arsenic.",
+        "A single ball gown could contain enough poison to kill dozens of people.",
+        "As women danced the arsenic dust would shake off and poison them slowly causing headaches and sores.",
+        "But the seamstresses had it worse because they died horrific deaths just from touching the fabric.",
+        "Despite warnings people kept wearing it because dying for fashion was literal back then.",
+        "Subscribe to discover more dark secrets from history.",
+    ];
+
+    // Split the joined script into lines with WORDS_PER_CAPTION words each
+    // Respect full stops to avoid splitting sentences across captions
+    const words = SCRIPT.join(' ').split(/\s+/);
+    const SCRIPT_LINES = [];
+    let currentChunk: string[] = [];
+
+    for (const word of words) {
+        currentChunk.push(word);
+        if (word.endsWith('.') || currentChunk.length >= WORDS_PER_CAPTION) {
+            SCRIPT_LINES.push(currentChunk.join(' '));
+            currentChunk = [];
+        }
+    }
+    if (currentChunk.length > 0) {
+        SCRIPT_LINES.push(currentChunk.join(' '));
+    }
+
+    console.log(SCRIPT_LINES)
+
+
+    const ESTIMATED_DURATION = 45; // seconds total
+    // ============================================
+
+    try {
+        const os = await import('os');
+        const { spawn } = await import('child_process');
+
+        // Create temp directory
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'caption-test-'));
+
+        // Download video
+        console.log(`🎬 Downloading video from: ${VIDEO_URL}`);
+        const inputVideo = path.join(tempDir, 'background.mp4');
+        const videoResponse = await fetch(VIDEO_URL);
+        if (!videoResponse.ok) {
+            throw new Error(`Failed to download video: ${videoResponse.status}`);
+        }
+        const bgVideoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+        fs.writeFileSync(inputVideo, bgVideoBuffer);
+        console.log(`   Downloaded: ${bgVideoBuffer.length} bytes`);
+
+        // Download audio
+        console.log(`🎤 Downloading audio from: ${AUDIO_URL}`);
+        const voiceoverPath = path.join(tempDir, 'voiceover.mp3');
+        const voResponse = await fetch(AUDIO_URL);
+        if (!voResponse.ok) {
+            throw new Error(`Failed to download audio: ${voResponse.status}`);
+        }
+        const voBuffer = Buffer.from(await voResponse.arrayBuffer());
+        fs.writeFileSync(voiceoverPath, voBuffer);
+        console.log(`   Downloaded: ${voBuffer.length} bytes`);
+
+        // Generate SRT from script lines with estimated timing
+        const avgLineTime = ESTIMATED_DURATION / SCRIPT_LINES.length;
+        let srtContent = '';
+        let currentTime = 0;
+
+        for (let i = 0; i < SCRIPT_LINES.length; i++) {
+            const text = SCRIPT_LINES[i];
+            const startTime = currentTime;
+            const endTime = currentTime + avgLineTime - 0.1;
+
+            const formatTime = (s: number) => {
+                const hrs = Math.floor(s / 3600);
+                const mins = Math.floor((s % 3600) / 60);
+                const secs = Math.floor(s % 60);
+                const ms = Math.floor((s % 1) * 1000);
+                return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+            };
+
+            srtContent += `${i + 1}\n${formatTime(startTime)} --> ${formatTime(endTime)}\n${text}\n\n`;
+            currentTime += avgLineTime;
+        }
+
+        const srtPath = path.join(tempDir, 'test.srt');
+        const outputPath = path.join(tempDir, 'test-output.mp4');
+        fs.writeFileSync(srtPath, srtContent, 'utf8');
+        console.log(`📝 Generated SRT with ${SCRIPT_LINES.length} captions`);
+
+        // Build ASS style from hardcoded values
+        const styleParams = [
+            `Fontname=${FONTNAME}`,
+            `Fontsize=${FONTSIZE}`,
+            `PrimaryColour=${PRIMARY_COLOUR}`,
+            `OutlineColour=${OUTLINE_COLOUR}`,
+            `BackColour=${BACK_COLOUR}`,
+            `Bold=${BOLD}`,
+            `Outline=${OUTLINE}`,
+            `Shadow=${SHADOW}`,
+            `Alignment=${ALIGNMENT}`,
+            `MarginL=${MARGIN_L}`,
+            `MarginR=${MARGIN_R}`,
+            `MarginV=${MARGIN_V}`,
+        ].join(',');
+
+        const escapedSrtPath = srtPath.replace(/'/g, "'\\''").replace(/:/g, '\\:');
+        const subtitleFilter = `subtitles='${escapedSrtPath}':force_style='${styleParams}'`;
+
+        // Build FFmpeg args
+        const args: string[] = [
+            '-i', inputVideo,
+            '-i', voiceoverPath,
+            '-t', String(ESTIMATED_DURATION),
+            '-vf', subtitleFilter,
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
+            '-map', '0:v:0', '-map', '1:a:0',
+            '-c:a', 'aac', '-b:a', '128k',
+            '-y', outputPath,
+        ];
+
+        console.log('🧪 Generating caption test video...');
+        console.log(`   Style: ${styleParams}`);
+
+        // Run FFmpeg
+        await new Promise<void>((resolve, reject) => {
+            const proc = spawn('ffmpeg', args);
+            let stderr = '';
+            proc.stderr?.on('data', (data) => { stderr += data.toString(); });
+            proc.on('close', (code) => {
+                if (code === 0) resolve();
+                else reject(new Error(`FFmpeg failed: ${stderr.slice(-300)}`));
+            });
+            proc.on('error', reject);
+        });
+
+        // Read the output file and send as base64 data URL
+        const videoBuffer = fs.readFileSync(outputPath);
+        const base64Video = videoBuffer.toString('base64');
+        const videoDataUrl = `data:video/mp4;base64,${base64Video}`;
+
+        // Cleanup
+        fs.rmSync(tempDir, { recursive: true, force: true });
+
+        console.log('✅ Caption test video generated');
+        res.json({ videoUrl: videoDataUrl });
+
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Caption test error:', message);
+        res.status(500).json({ error: message });
+    }
+});
+
 // ============= Viral Video Project APIs =============
 
 // Create a new project
@@ -1814,7 +1997,7 @@ app.get('/auth/youtube/callback', async (req: Request, res: Response) => {
         await saveUserTokens(userId, tokens, email, youtubeId);
 
         // Redirect to frontend dashboard with auth tokens
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         res.redirect(`${frontendUrl}/dashboard?token=${tokens.id_token}&userId=${userId}&email=${encodeURIComponent(email)}`);
 
     } catch (error: any) {
