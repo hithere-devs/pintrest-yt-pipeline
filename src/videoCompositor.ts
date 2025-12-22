@@ -32,6 +32,7 @@ export interface CompositionInput {
     outputPath?: string;
     musicVolume?: number; // 0-1, default 0.2
     voiceoverVolume?: number; // 0-1, default 1.0
+    wordsPerCaption?: number; // 1-4, default 2 for viral style
 }
 
 export interface CompositionResult {
@@ -252,6 +253,7 @@ export async function compositeVideo(input: CompositionInput): Promise<Compositi
         outputPath: customOutputPath,
         musicVolume = 0.2,
         voiceoverVolume = 1.0,
+        wordsPerCaption = 2, // Default 2 words for viral style like "This beautiful"
     } = input;
 
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'viral-video-'));
@@ -273,9 +275,8 @@ export async function compositeVideo(input: CompositionInput): Promise<Compositi
         const srtPath = path.join(tempDir, 'captions.srt');
         let srtContent: string;
         if (wordTimings && wordTimings.length > 0) {
-            console.log(`📝 Generating SRT from ${wordTimings.length} word timings (precise sync)`);
-            // Use 1 word per caption for viral style (word-by-word)
-            srtContent = generateSRTFromWordTimings(wordTimings, 1);
+            console.log(`📝 Generating SRT from ${wordTimings.length} word timings (${wordsPerCaption} words per caption)`);
+            srtContent = generateSRTFromWordTimings(wordTimings, wordsPerCaption);
         } else {
             console.log('📝 Generating SRT from script lines (estimated timing)');
             srtContent = generateSRT(scriptLines);
@@ -378,6 +379,15 @@ export async function compositeVideo(input: CompositionInput): Promise<Compositi
 /**
  * Build caption filter string for FFmpeg
  * Optimized for 9:16 portrait short-form videos (Reels/Shorts/TikTok)
+ *
+ * Target: Clean, centered captions like viral TikTok/Reels videos
+ * - Text centered both horizontally and vertically on screen
+ * - Strong outline for visibility on any background
+ *
+ * Positioning strategy:
+ * - Always use Alignment=2 (bottom-center anchor) for consistent text centering
+ * - Control vertical position with MarginV (distance from bottom)
+ * - For 1920px height: top ~1700, center ~850, bottom ~100
  */
 function buildCaptionFilter(settings: CaptionSettings, srtPath: string): string {
     const {
@@ -387,62 +397,61 @@ function buildCaptionFilter(settings: CaptionSettings, srtPath: string): string 
         strokeColor,
         strokeWidth,
         position,
-        animation,
     } = settings;
 
-    // Use smaller font for short-form video (scale down by 60%)
-    // Minimum 24, maximum 36 for readability on mobile
-    const scaledFontSize = Math.min(36, Math.max(24, Math.floor(fontSize * 0.6)));
+    // Scale font size for ASS subtitles on 1080x1920 video
+    // UI default is 40, target ~18-24px in ASS terms
+    const scaledFontSize = Math.min(28, Math.max(14, Math.floor(fontSize * 0.5)));
 
-    // ASS Alignment values:
-    // 1=bottom-left, 2=bottom-center, 3=bottom-right
-    // 4=middle-left, 5=middle-center, 6=middle-right
-    // 7=top-left, 8=top-center, 9=top-right
-    let alignment = 5; // Default to center
-    let marginV = 0;
+    // Always use alignment 2 (bottom-center) - text will be horizontally centered
+    // Then use MarginV to push it up from the bottom to desired position
+    // For 1920px video: top needs ~1700 MarginV, center ~850, bottom ~100
+    const alignment = 2;
+    let marginV = 100; // Default bottom
 
     switch (position) {
         case 'top':
-            alignment = 8; // top-center
-            marginV = 100;
+            marginV = 1700; // Push up from bottom to top area
             break;
         case 'center':
-            alignment = 5; // middle-center (vertically centered)
-            marginV = 0;
+            marginV = 850;  // Push up to center
             break;
         case 'bottom':
-            alignment = 2; // bottom-center
-            marginV = 80;
+            marginV = 100;  // Small margin from bottom
             break;
     }
 
-    // Map UI fonts to available system fonts on macOS/Linux
+    // Map fonts
     const fontMap: Record<string, string> = {
-        'Montserrat': 'Helvetica', // Fallback since Montserrat isn't standard
+        'Montserrat': 'Arial',
         'Arial': 'Arial',
         'Impact': 'Impact',
         'Helvetica': 'Helvetica',
         'Roboto': 'Arial',
-        'Open Sans': 'Helvetica',
     };
     const systemFont = fontMap[font] || 'Arial';
 
-    // Use subtitles filter for SRT support
-    // Force style with ASS override - smaller, centered, with bold text
-    const style = [
-        `FontName=${systemFont}`,
-        `FontSize=${scaledFontSize}`,
+    // Calculate outline - proportional to font size
+    const scaledOutline = Math.max(1, Math.min(3, Math.ceil(scaledFontSize * 0.08)));
+
+    // Build ASS style string with explicit centering
+    const styleParams = [
+        `Fontname=${systemFont}`,
+        `Fontsize=10`,
         `PrimaryColour=${hexToAss(fontColor)}`,
         `OutlineColour=${hexToAss(strokeColor)}`,
-        `Outline=${strokeWidth}`,
+        `BackColour=&H40000000`,
         `Bold=1`,
-        `Alignment=${alignment}`,
-        `MarginV=${marginV}`,
-        `MarginL=40`,
-        `MarginR=40`,
+        `Outline=${scaledOutline}`,
+        `Shadow=0`,
+        `Alignment=2`,
+        `MarginL=0`,
+        `MarginR=0`,
+        `MarginV=1`,
     ].join(',');
 
-    return `subtitles='${srtPath}':force_style='${style}'`;
+    // Use subtitles filter with original_size to ensure proper scaling
+    return `subtitles='${srtPath}':force_style='${styleParams}'`;
 }
 
 /**
