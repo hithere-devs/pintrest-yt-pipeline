@@ -191,6 +191,7 @@ jobs:
           fi
 
       - name: Setup Nginx configuration
+        if: ${{ env.DOMAIN != '' }}
         run: |
           NGINX_CONF="/etc/nginx/sites-available/${{ env.APP_NAME }}"
           if [ ! -f "$NGINX_CONF" ]; then
@@ -227,11 +228,13 @@ jobs:
           fi
 
       - name: Test and reload Nginx
+        if: ${{ env.DOMAIN != '' }}
         run: |
           sudo nginx -t
           sudo systemctl reload nginx
 
       - name: Install Certbot if not present
+        if: ${{ env.DOMAIN != '' }}
         run: |
           if ! command -v certbot &> /dev/null; then
             echo "Certbot not found, installing..."
@@ -242,6 +245,7 @@ jobs:
           fi
 
       - name: Setup SSL with Certbot
+        if: ${{ env.DOMAIN != '' }}
         run: |
           # Check if certificate already exists for the domain
           if [ ! -d "/etc/letsencrypt/live/${{ env.DOMAIN }}" ]; then
@@ -253,6 +257,7 @@ jobs:
           fi
 
       - name: Setup Certbot auto-renewal cron
+        if: ${{ env.DOMAIN != '' }}
         run: |
           # Add cron job for auto-renewal if not already present
           if ! sudo crontab -l 2>/dev/null | grep -q "certbot renew"; then
@@ -263,6 +268,7 @@ jobs:
           fi
 
       - name: Final Nginx restart
+        if: ${{ env.DOMAIN != '' }}
         run: |
           sudo nginx -t
           sudo systemctl restart nginx
