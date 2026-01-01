@@ -1,5 +1,4 @@
--- Enable UUID extension
-create extension if not exists "uuid-ossp";
+-- gen_random_uuid() is built-in to PostgreSQL 13+ (no extension needed for Azure PostgreSQL)
 
 -- Create User table
 create table if not exists "User" (
@@ -13,7 +12,7 @@ create table if not exists "User" (
 
 -- Create Video table
 create table if not exists "Video" (
-  "id" uuid primary key default uuid_generate_v4(),
+  "id" uuid primary key default gen_random_uuid(),
   "userId" text references "User"("id"),
   "pinterestUrl" text not null,
   "status" text not null default 'QUEUED',
@@ -38,7 +37,7 @@ create index if not exists "Video_status_idx" on "Video"("status");
 
 -- Create Frame table for extracted video frames
 create table if not exists "Frame" (
-  "id" uuid primary key default uuid_generate_v4(),
+  "id" uuid primary key default gen_random_uuid(),
   "videoId" uuid references "Video"("id") on delete cascade,
   "index" integer not null,
   "timestamp" decimal not null,
@@ -52,7 +51,7 @@ create index if not exists "Frame_videoId_idx" on "Frame"("videoId");
 
 -- Create ResearchTask table for deep research tracking
 create table if not exists "ResearchTask" (
-  "id" uuid primary key default uuid_generate_v4(),
+  "id" uuid primary key default gen_random_uuid(),
   "videoId" uuid references "Video"("id") on delete cascade,
   "userId" text references "User"("id"),
   "status" text not null default 'pending',
@@ -77,7 +76,7 @@ create index if not exists "ResearchTask_status_idx" on "ResearchTask"("status")
 
 -- Create AssetLibrary table for videos, music, and voice profiles
 create table if not exists "AssetLibrary" (
-  "id" uuid primary key default uuid_generate_v4(),
+  "id" uuid primary key default gen_random_uuid(),
   "type" text not null check ("type" in ('video', 'music', 'voice')),
   "name" text not null,
   "description" text,
@@ -97,7 +96,7 @@ create index if not exists "AssetLibrary_isActive_idx" on "AssetLibrary"("isActi
 
 -- Create ViralVideoProject table for tracking video generation projects
 create table if not exists "ViralVideoProject" (
-  "id" uuid primary key default uuid_generate_v4(),
+  "id" uuid primary key default gen_random_uuid(),
   "userId" text references "User"("id"),
   "status" text not null default 'draft' check ("status" in ('draft', 'generating_script', 'generating_voiceover', 'compositing', 'completed', 'failed', 'scheduled')),
   "name" text,
@@ -127,7 +126,7 @@ create index if not exists "ViralVideoProject_status_idx" on "ViralVideoProject"
 
 -- Create ScheduledVideo table for scheduling generated videos
 create table if not exists "ScheduledVideo" (
-  "id" uuid primary key default uuid_generate_v4(),
+  "id" uuid primary key default gen_random_uuid(),
   "projectId" uuid references "ViralVideoProject"("id") on delete cascade,
   "userId" text references "User"("id"),
   "scheduledAt" timestamp with time zone not null,

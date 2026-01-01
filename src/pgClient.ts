@@ -4,7 +4,7 @@ import 'dotenv/config';
 // Parse the DATABASE_URL or use individual env vars
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: false, // SSL disabled for local PostgreSQL
+    ssl: process.env.DATABASE_URL?.includes('azure') ? { rejectUnauthorized: false } : false,
 });
 
 // Test connection on startup
@@ -40,8 +40,7 @@ export async function queryOne<T = any>(text: string, params?: any[]): Promise<T
 export async function initializeDatabase(): Promise<void> {
     const client = await pool.connect();
     try {
-        // Enable UUID extension
-        await client.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+        // gen_random_uuid() is built-in to PostgreSQL 13+ (no extension needed for Azure PostgreSQL)
 
         // Create User table
         await client.query(`
@@ -58,7 +57,7 @@ export async function initializeDatabase(): Promise<void> {
         // Create Video table
         await client.query(`
             CREATE TABLE IF NOT EXISTS "Video" (
-                "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 "userId" TEXT REFERENCES "User"("id"),
                 "pinterestUrl" TEXT NOT NULL,
                 "status" TEXT NOT NULL DEFAULT 'QUEUED',
@@ -94,7 +93,7 @@ export async function initializeDatabase(): Promise<void> {
         // Create Frame table for extracted video frames
         await client.query(`
             CREATE TABLE IF NOT EXISTS "Frame" (
-                "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 "videoId" UUID REFERENCES "Video"("id") ON DELETE CASCADE,
                 "index" INTEGER NOT NULL,
                 "timestamp" DECIMAL NOT NULL,
@@ -108,7 +107,7 @@ export async function initializeDatabase(): Promise<void> {
         // Create ResearchTask table for deep research tracking
         await client.query(`
             CREATE TABLE IF NOT EXISTS "ResearchTask" (
-                "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 "videoId" UUID REFERENCES "Video"("id") ON DELETE CASCADE,
                 "userId" TEXT REFERENCES "User"("id"),
                 "status" TEXT NOT NULL DEFAULT 'pending',
@@ -128,7 +127,7 @@ export async function initializeDatabase(): Promise<void> {
         // Create AssetLibrary table for videos, music, and voice profiles
         await client.query(`
             CREATE TABLE IF NOT EXISTS "AssetLibrary" (
-                "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 "type" TEXT NOT NULL CHECK ("type" IN ('video', 'music', 'voice')),
                 "name" TEXT NOT NULL,
                 "description" TEXT,
@@ -147,7 +146,7 @@ export async function initializeDatabase(): Promise<void> {
         // Create ViralVideoProject table for tracking video generation projects
         await client.query(`
             CREATE TABLE IF NOT EXISTS "ViralVideoProject" (
-                "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 "userId" TEXT REFERENCES "User"("id"),
                 "status" TEXT NOT NULL DEFAULT 'draft' CHECK ("status" IN ('draft', 'generating_script', 'generating_voiceover', 'compositing', 'completed', 'failed', 'scheduled')),
                 "name" TEXT,
@@ -176,7 +175,7 @@ export async function initializeDatabase(): Promise<void> {
         // Create ScheduledVideo table for scheduling generated videos
         await client.query(`
             CREATE TABLE IF NOT EXISTS "ScheduledVideo" (
-                "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 "projectId" UUID REFERENCES "ViralVideoProject"("id") ON DELETE CASCADE,
                 "userId" TEXT REFERENCES "User"("id"),
                 "scheduledAt" TIMESTAMP WITH TIME ZONE NOT NULL,
