@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import type { PinterestMetadata } from './pinterestDL';
 import { getDeepResearch } from './deepResearch';
 
@@ -176,7 +176,7 @@ Your response MUST be in a single, clean JSON block with no extra text before or
             contents,
             config: {
                 thinkingConfig: {
-                    thinkingLevel: 'HIGH',
+                    thinkingLevel: ThinkingLevel.HIGH,
                 },
             },
         });

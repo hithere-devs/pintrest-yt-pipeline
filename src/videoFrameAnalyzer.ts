@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 
 export interface ExtractedFrame {
     index: number;
@@ -198,7 +198,7 @@ Keep the description concise and factual.`
             const streamResult = await ai.models.generateContentStream({
                 model: 'gemini-3-pro-preview',
                 contents,
-                config: { thinkingConfig: { thinkingLevel: 'HIGH' } }
+                config: { thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } }
             });
             let description = '';
             for await (const chunk of streamResult) {

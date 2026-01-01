@@ -638,7 +638,7 @@ Please structure your response clearly with sections for Title, Description, Has
                     try {
                         const apiKey = process.env.GEMINI_API_KEY;
                         if (apiKey) {
-                            const { GoogleGenAI } = await import('@google/genai');
+                            const { GoogleGenAI, ThinkingLevel } = await import('@google/genai');
                             const ai = new GoogleGenAI({ apiKey });
 
                             const extractionPrompt = `You are a YouTube content expert. Extract structured metadata from this research content for a YouTube video.
@@ -665,7 +665,7 @@ Return ONLY the JSON object, no other text.`;
                             const streamResult = await ai.models.generateContentStream({
                                 model: 'gemini-3-pro-preview',
                                 contents,
-                                config: { thinkingConfig: { thinkingLevel: 'HIGH' } }
+                                config: { thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } }
                             });
                             let responseText = '';
                             for await (const chunk of streamResult) {
@@ -863,7 +863,7 @@ app.post('/research/extract', requireAuth, async (req: Request, res: Response) =
             return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
         }
 
-        const { GoogleGenAI } = await import('@google/genai');
+        const { GoogleGenAI, ThinkingLevel } = await import('@google/genai');
         const ai = new GoogleGenAI({ apiKey });
 
         const extractionPrompt = `You are a YouTube content expert. Extract structured metadata from this research content for a YouTube video.
@@ -890,7 +890,7 @@ Return ONLY the JSON object, no other text.`;
         const streamResult = await ai.models.generateContentStream({
             model: 'gemini-3-pro-preview',
             contents,
-            config: { thinkingConfig: { thinkingLevel: 'HIGH' } }
+            config: { thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } }
         });
         let responseText = '';
         for await (const chunk of streamResult) {
@@ -1565,21 +1565,23 @@ app.post('/viral/generate-script', requireAuth, async (req: Request, res: Respon
     }
 
     try {
-        const { GoogleGenAI } = await import('@google/genai');
+        const { GoogleGenAI, ThinkingLevel } = await import('@google/genai');
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-        const platformGuide = {
+        const platformGuideMap: Record<string, string> = {
             youtube_shorts: 'YouTube Shorts (under 60 seconds, vertical 9:16, hook in first 2 seconds)',
             youtube: 'YouTube (longer form, can be horizontal)',
             tiktok: 'TikTok (under 60 seconds, trendy, fast-paced)',
             instagram_reels: 'Instagram Reels (under 90 seconds, visually appealing)',
-        }[platform] || 'short-form video';
+        };
+        const platformGuide = platformGuideMap[platform] || 'short-form video';
 
-        const formatGuide = {
+        const formatGuideMap: Record<string, string> = {
             monologue: 'single narrator speaking directly to camera',
             dialogue: `conversation between ${speakers?.length || 2} characters`,
             narration: 'documentary-style narration over visuals',
-        }[format] || 'monologue';
+        };
+        const formatGuide = formatGuideMap[format] || 'monologue';
 
         const prompt = `Generate a viral ${platformGuide} script about: "${topic}"
 
@@ -1625,7 +1627,7 @@ Only return valid JSON, no markdown or extra text.`;
         const streamResult = await ai.models.generateContentStream({
             model: 'gemini-3-pro-preview',
             contents,
-            config: { thinkingConfig: { thinkingLevel: 'HIGH' } }
+            config: { thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } }
         });
         let responseText = '';
         for await (const chunk of streamResult) {
@@ -1674,7 +1676,7 @@ app.post('/viral/random-idea', requireAuth, async (req: Request, res: Response) 
     const { category } = req.body;
 
     try {
-        const { GoogleGenAI } = await import('@google/genai');
+        const { GoogleGenAI, ThinkingLevel } = await import('@google/genai');
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
         const categoryHint = category ? `in the category of "${category}"` : '';
@@ -1699,7 +1701,7 @@ Return ONLY a JSON object with this structure (no markdown, no extra text):
         const streamResult = await ai.models.generateContentStream({
             model: 'gemini-3-pro-preview',
             contents,
-            config: { thinkingConfig: { thinkingLevel: 'HIGH' } }
+            config: { thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } }
         });
         let responseText = '';
         for await (const chunk of streamResult) {
@@ -1770,7 +1772,7 @@ app.post('/viral/generate-voiceover', requireAuth, async (req: Request, res: Res
                 voiceoverS3Url: result.s3Url,
                 voiceoverDuration: result.duration,
                 voiceId: voiceId || 'narrator',
-                wordTimings: result.wordTimings ? JSON.stringify(result.wordTimings) : null,
+                wordTimings: result.wordTimings ? JSON.stringify(result.wordTimings) : undefined,
                 status: 'draft',
             });
             res.json({ success: true, voiceover: result });
